@@ -63,7 +63,7 @@ class StandardQueryEvaluator(protected val database: Database, queryFactory: Que
   }
 
   private def withTransaction[A](f: Transaction => A) = {
-    database.withConnection { connection => f(new Transaction(queryFactory, connection)) }
+    database.withConnection { connection => f(new StandardTransaction(queryFactory, connection)) }
   }
 
   override def equals(other: Any) = {
