@@ -76,4 +76,6 @@ class StandardQueryEvaluator(protected val database: Database, queryFactory: Que
   }
 
   override def hashCode = database.hashCode
+
+  def shutdown() { database.shutdown() }
 }

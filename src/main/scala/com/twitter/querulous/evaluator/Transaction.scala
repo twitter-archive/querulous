@@ -57,4 +57,6 @@ class Transaction(queryFactory: QueryFactory, connection: Connection) extends Qu
   }
 
   def transaction[T](f: Transaction => T) = f(this)
+
+  def shutdown() { }
 }

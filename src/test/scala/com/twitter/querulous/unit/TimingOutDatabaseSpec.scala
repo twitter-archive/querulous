@@ -24,6 +24,7 @@ class TimingOutDatabaseSpec extends Specification with JMocker with ClassMocker 
         connection
       }
       def close(connection: Connection) = ()
+      def shutdown() { }
     }
 
     expect {

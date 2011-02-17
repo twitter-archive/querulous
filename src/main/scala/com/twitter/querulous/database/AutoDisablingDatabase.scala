@@ -33,4 +33,6 @@ class AutoDisablingDatabase(database: Database, dbhost: String, protected val di
   }
 
   def close(connection: Connection) { database.close(connection) }
+
+  def shutdown() { database.shutdown() }
 }

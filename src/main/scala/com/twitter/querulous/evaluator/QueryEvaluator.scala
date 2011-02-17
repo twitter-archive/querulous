@@ -110,4 +110,6 @@ trait QueryEvaluator {
     insert(QueryClass.Execute, query, params: _*)
 
   def transaction[T](f: Transaction => T): T
+
+  def shutdown()
 }

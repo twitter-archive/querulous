@@ -17,4 +17,6 @@ class FakeDatabase(connection: Connection, before: Option[String => Unit]) exten
   def close(connection: Connection) {
     before.foreach { _("close") }
   }
+
+  def shutdown() { }
 }

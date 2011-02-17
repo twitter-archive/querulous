@@ -87,6 +87,7 @@ class DatabaseSpec extends Specification with JMocker with ClassMocker {
     val fake = new Object with Database {
       def open() = null
       def close(connection: Connection) = ()
+      def shutdown() { }
     }.asInstanceOf[{def url(a: List[String], b:String, c:Map[String, String]): String}]
 
     "add default unicode urlOptions" in {

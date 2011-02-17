@@ -90,6 +90,8 @@ class ApachePoolingDatabase(
     }
   }
 
+  def shutdown() { connectionPool.close() }
+
   def open() = poolingDataSource.getConnection()
 
   override def toString = dbhosts.head + "_" + dbname

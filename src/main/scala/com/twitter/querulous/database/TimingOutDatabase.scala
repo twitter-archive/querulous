@@ -49,4 +49,6 @@ class TimingOutDatabase(database: Database, dbhosts: List[String], dbname: Strin
   override def open() = getConnection(openTimeout)
 
   def close(connection: Connection) { database.close(connection) }
+
+  def shutdown() { database.shutdown() }
 }

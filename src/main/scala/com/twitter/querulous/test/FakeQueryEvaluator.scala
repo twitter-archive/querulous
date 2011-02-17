@@ -15,4 +15,5 @@ class FakeQueryEvaluator[A](trans: Transaction, resultSets: Seq[ResultSet]) exte
   def nextId(tableName: String) = 0
   def insert(queryClass: QueryClass, query: String, params: Any*) = 0
   def transaction[T](f: Transaction => T) = f(trans)
+  def shutdown() { }
 }

@@ -38,4 +38,6 @@ class StatsCollectingDatabase(database: Database, stats: StatsCollector)
       }
     }
   }
+
+  def shutdown() { database.shutdown() }
 }
