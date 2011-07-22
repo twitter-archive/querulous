@@ -10,6 +10,7 @@ with SubversionPublisher {
   val dbcp      = "commons-dbcp" % "commons-dbcp"         % "1.4"
   val mysqljdbc = "mysql"        % "mysql-connector-java" % "5.1.13"
   val pool      = "commons-pool" % "commons-pool"         % "1.5.4"
+  val finagle   = "com.twitter"  % "finagle-core"         % "1.7.3"
 
   val utilEval   = "com.twitter"             % "util-eval"      % "1.10.1" % "test"
   val scalaTools = "org.scala-lang"          % "scala-compiler" % "2.8.1"  % "test"
