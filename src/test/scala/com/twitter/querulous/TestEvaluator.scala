@@ -13,7 +13,6 @@ import org.specs.Specification
 
 import config.Connection
 
-
 trait ConfiguredSpecification extends Specification {
   val config = try {
     val eval = new Eval

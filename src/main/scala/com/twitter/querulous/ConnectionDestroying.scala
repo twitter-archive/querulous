@@ -3,6 +3,7 @@ package com.twitter.querulous.query
 import java.sql.Connection
 import org.apache.commons.dbcp.{DelegatingConnection => DBCPConnection}
 import com.mysql.jdbc.{ConnectionImpl => MySQLConnection}
+import com.twitter.querulous.test.sql.FakeConnection
 
 // Emergency connection destruction toolkit
 trait ConnectionDestroying {
@@ -13,6 +14,8 @@ trait ConnectionDestroying {
           destroyDbcpWrappedConnection(c)
         case c: MySQLConnection =>
           destroyMysqlConnection(c)
+        case c: FakeConnection =>
+          c.abortInternal()
         case _ => error("Unsupported driver type, cannot reliably timeout.")
       }
   }
