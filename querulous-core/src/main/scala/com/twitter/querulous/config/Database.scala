@@ -63,11 +63,21 @@ class Database {
   var timeout: Option[TimingOutDatabase] = None
   def timeout_=(t: TimingOutDatabase) { timeout = Some(t) }
   var memoize: Boolean = true
+  var name: Option[String] = None
+  def name_=(s: String) { name = Some(s) }
 
-  def apply(stats: StatsCollector): DatabaseFactory = {
+  def apply(stats: StatsCollector): DatabaseFactory = apply(stats, None)
+
+  def apply(stats: StatsCollector, statsFactory: DatabaseFactory => DatabaseFactory): DatabaseFactory = apply(stats, Some(statsFactory))
+
+  def apply(stats: StatsCollector, statsFactory: Option[DatabaseFactory => DatabaseFactory]): DatabaseFactory = {
     var factory = pool.map(_()).getOrElse(new SingleConnectionDatabaseFactory)
 
     timeout.foreach { timeout => factory = timeout(factory) }
+
+    statsFactory.foreach { f =>
+      factory = f(factory)
+    }
 
     if (stats ne NullStatsCollector) {
       factory = new StatsCollectingDatabaseFactory(factory, stats)
