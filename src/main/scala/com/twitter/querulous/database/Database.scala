@@ -4,6 +4,7 @@ import java.sql.Connection
 import com.twitter.util.Duration
 
 object Database {
+  //TODO: allow passing this via setup configuration
   private[querulous] var driverName: String = "jdbc:mysql"
 
   val defaultUrlOptions = Map(

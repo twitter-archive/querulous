@@ -1,7 +1,7 @@
 package com.twitter.querulous.integration
 
 import com.twitter.util.Time
-import com.twitter.util.TimeConversions._
+import com.twitter.conversions.time._
 import com.twitter.querulous.evaluator.StandardQueryEvaluatorFactory
 import com.twitter.querulous.ConfiguredSpecification
 import com.twitter.querulous.sql.{FakeContext, FakeDriver}

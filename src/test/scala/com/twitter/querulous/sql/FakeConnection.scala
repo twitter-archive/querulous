@@ -17,7 +17,7 @@ class FakeConnection(val url: String, val info: Properties, val user: String, va
 
   FakeConnection.checkTimeout(host, properties)
 
-  override def destroy() {
+  def destroy() {
     this.close()
     this.destroyed = true
   }

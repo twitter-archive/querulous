@@ -2,7 +2,7 @@ package com.twitter.querulous.sql
 
 import scala.collection.mutable
 import com.twitter.util.Duration
-import com.twitter.util.TimeConversions._
+import com.twitter.conversions.time._
 import java.util.concurrent.TimeUnit
 
 object FakeContext {
