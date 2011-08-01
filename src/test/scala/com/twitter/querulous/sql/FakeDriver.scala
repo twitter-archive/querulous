@@ -1,4 +1,4 @@
-package com.twitter.querulous.test.sql
+package com.twitter.querulous.sql
 
 import java.util.Properties
 import java.sql._
@@ -7,7 +7,11 @@ class FakeDriver extends Driver {
   @throws(classOf[SQLException])
   def connect(url: String, info: Properties): Connection = {
     if (acceptsURL(url)) {
-      new FakeConnection(url, info)
+      val (user, password) = info match {
+        case null => ("root", "")
+        case _ => (info.getProperty("user", "root"), info.getProperty("password", ""))
+      }
+      new FakeConnection(url, info, user, password)
     } else {
       null
     }
@@ -15,19 +19,19 @@ class FakeDriver extends Driver {
 
   @throws(classOf[SQLException])
   def acceptsURL(url: String): Boolean = {
-    url.startsWith(FakeDriver.DRIVER_NAME);
+    url.startsWith(FakeDriver.DRIVER_NAME)
   }
 
   def getMajorVersion: Int = {
-    FakeDriver.MAJOR_VERSION;
+    FakeDriver.MAJOR_VERSION
   }
 
   def getMinorVersion: Int = {
-    FakeDriver.MINOR_VERSION;
+    FakeDriver.MINOR_VERSION
   }
 
   def jdbcCompliant: Boolean = {
-    true;
+    true
   }
 
   def getPropertyInfo(url: String, info: Properties): scala.Array[DriverPropertyInfo] = {

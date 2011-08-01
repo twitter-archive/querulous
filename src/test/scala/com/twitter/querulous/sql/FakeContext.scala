@@ -1,4 +1,4 @@
-package com.twitter.querulous.test.sql
+package com.twitter.querulous.sql
 
 import scala.collection.mutable
 import com.twitter.util.Duration
@@ -89,25 +89,25 @@ object FakeContext {
     }
   }
 
-  def setQueryResult(host: String, statement: String, result: Array[Array[Any]]) {
+  def setQueryResult(host: String, statement: String, result: Array[Array[java.lang.Object]]) {
     configMap.synchronized {
       configMap.get(host) match {
         case Some(c) => c.resultMap.put(statement, result)
         case None => {
           if (result != null && result.length > 0) {
             configMap.put(host, FakeServerConfig(
-              resultMap = mutable.HashMap[String, Array[Array[Any]]]((statement, result))))
+              resultMap = mutable.HashMap[String, Array[Array[java.lang.Object]]]((statement, result))))
           }
         }
       }
     }
   }
 
-  def getQueryResult(host: String, statement: String): Array[Array[Any]] = {
+  def getQueryResult(host: String, statement: String): Array[Array[java.lang.Object]] = {
     configMap.synchronized {
       configMap.get(host) match {
-        case Some(c) => c.resultMap.get(statement).getOrElse(Array[Array[Any]]())
-        case None => Array[Array[Any]]()
+        case Some(c) => c.resultMap.get(statement).getOrElse(Array[Array[java.lang.Object]]())
+        case None => Array[Array[java.lang.Object]]()
       }
     }
   }
@@ -118,4 +118,4 @@ case class FakeServerConfig (
   var isDown: Boolean = false,
   var timeTakenToOpenConn: Duration = Duration(0, TimeUnit.SECONDS),
   var timeTakenToExecQuery: Duration = Duration(0, TimeUnit.SECONDS),
-  resultMap: mutable.Map[String, Array[Array[Any]]] = mutable.HashMap[String, Array[Array[Any]]]())
+  resultMap: mutable.Map[String, Array[Array[java.lang.Object]]] = mutable.HashMap[String, Array[Array[java.lang.Object]]]())

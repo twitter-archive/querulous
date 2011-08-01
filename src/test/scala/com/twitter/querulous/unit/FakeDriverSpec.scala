@@ -2,12 +2,12 @@ package com.twitter.querulous.unit
 
 import com.twitter.querulous.ConfiguredSpecification
 import com.twitter.util.TimeConversions._
-import com.twitter.querulous.test.sql.FakeDriver
+import com.twitter.querulous.sql.FakeDriver
 import org.apache.commons.dbcp.DelegatingConnection
 import com.twitter.querulous.database._
 
 class FakeDriverSpec extends ConfiguredSpecification {
-  Database.driverName = FakeDriver.DRIVER_NAME
+  doBeforeSpec { Database.driverName = FakeDriver.DRIVER_NAME }
 
   def testFactory(factory: DatabaseFactory) {
     "the real connection should be FakeConnection" in {
@@ -39,4 +39,5 @@ class FakeDriverSpec extends ConfiguredSpecification {
     testFactory(factory)
   }
 
+  doAfterSpec { Database.driverName = "jdbc:mysql" }
 }
