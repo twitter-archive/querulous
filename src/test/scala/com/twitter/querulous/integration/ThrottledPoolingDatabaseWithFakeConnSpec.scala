@@ -4,11 +4,10 @@ import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
 import com.twitter.querulous.evaluator.StandardQueryEvaluatorFactory
 import com.twitter.querulous.ConfiguredSpecification
-import com.twitter.querulous.database.{Database, SqlDatabaseTimeoutException, ThrottledPoolingDatabaseFactory}
 import com.twitter.querulous.sql.{FakeContext, FakeDriver}
-import java.sql.SQLException
-import com.twitter.querulous.query.{TimingOutQueryFactory, SqlQueryFactory}
 import com.mysql.jdbc.exceptions.jdbc4.CommunicationsException
+import com.twitter.querulous.database.{PoolEmptyException, Database, ThrottledPoolingDatabaseFactory}
+import com.twitter.querulous.query.{SqlQueryTimeoutException, TimingOutQueryFactory, SqlQueryFactory}
 
 object ThrottledPoolingDatabaseWithFakeConnSpec {
   // configure repopulation interval to a minute to avoid conn repopulation when test running
@@ -42,8 +41,8 @@ class ThrottledPoolingDatabaseWithFakeConnSpec extends ConfiguredSpecification {
       try {
         queryEvaluator.select("SELECT 1 FROM DUAL") { r => r.getInt(1) } must throwA[CommunicationsException]
         val t0 = Time.now
-        queryEvaluator.select("SELECT 1 FROM DUAL") { r => r.getInt(1) } must throwA[SQLException]
-        (Time.now - t0).inMillis must beCloseTo(0L, 10000L)
+        queryEvaluator.select("SELECT 1 FROM DUAL") { r => r.getInt(1) } must throwA[PoolEmptyException]
+        (Time.now - t0).inMillis must beCloseTo(0L, 100L)
       } finally {
         FakeContext.markServerUp(host)
       }
@@ -56,10 +55,10 @@ class ThrottledPoolingDatabaseWithFakeConnSpec extends ConfiguredSpecification {
       FakeContext.setTimeTakenToExecQuery(host, 1.second)
       try {
         // this will cause the underlying connection being destroyed
-        queryEvaluator.select("SELECT 1 FROM DUAL") { r => r.getInt(1) } must throwA[SQLException]
+        queryEvaluator.select("SELECT 1 FROM DUAL") { r => r.getInt(1) } must throwA[SqlQueryTimeoutException]
         val t0 = Time.now
-        queryEvaluator.select("SELECT 1 FROM DUAL") { r => r.getInt(1) } must throwA[SQLException]
-        (Time.now - t0).inMillis must beCloseTo(0L, 10000L)
+        queryEvaluator.select("SELECT 1 FROM DUAL") { r => r.getInt(1) } must throwA[PoolEmptyException]
+        (Time.now - t0).inMillis must beCloseTo(0L, 100L)
       } finally {
         FakeContext.setTimeTakenToExecQuery(host, 0.second)
       }
