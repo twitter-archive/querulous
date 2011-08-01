@@ -50,11 +50,11 @@ class FakeDriverSpec extends ConfiguredSpecification {
     }
 
     "throw an exception when db is marked down" in {
-      FakeContext.markServerDown(config.hostnames.mkString(","))
+      FakeContext.markServerDown(host)
       try {
         DriverManager.getConnection(connString, null) must throwA[CommunicationsException]
       } finally {
-        FakeContext.markServerUp(config.hostnames.mkString(","))
+        FakeContext.markServerUp(host)
       }
     }
   }
