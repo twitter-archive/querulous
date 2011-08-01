@@ -1,5 +1,4 @@
 import sbt._
-import Process._
 import com.twitter.sbt._
 
 class QuerulousProject(info: ProjectInfo) extends StandardLibraryProject(info)

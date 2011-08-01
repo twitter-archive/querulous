@@ -1,9 +1,7 @@
 package com.twitter.querulous.database
 
 import java.sql.Connection
-import com.twitter.querulous.StatsCollector
 import com.twitter.util.Duration
-
 
 object Database {
   private[querulous] var driverName: String = "jdbc:mysql"
