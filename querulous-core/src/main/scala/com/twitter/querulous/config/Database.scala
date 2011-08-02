@@ -2,7 +2,7 @@ package com.twitter.querulous.config
 
 import com.twitter.querulous._
 import com.twitter.util.Duration
-import com.twitter.util.TimeConversions._
+import com.twitter.conversions.time._
 import database._
 
 
@@ -63,6 +63,8 @@ class Database {
   var timeout: Option[TimingOutDatabase] = None
   def timeout_=(t: TimingOutDatabase) { timeout = Some(t) }
   var memoize: Boolean = true
+  var name: Option[String] = None
+  def name_=(s: String) { name = Some(s) }
 
   def apply(stats: StatsCollector): DatabaseFactory = apply(stats, None)
 

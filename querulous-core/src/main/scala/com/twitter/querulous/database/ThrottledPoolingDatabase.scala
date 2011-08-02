@@ -8,10 +8,10 @@ import org.apache.commons.dbcp.{PoolingDataSource, DelegatingConnection}
 import org.apache.commons.pool.{PoolableObjectFactory, ObjectPool}
 import com.twitter.util.Duration
 import com.twitter.util.Time
-import com.twitter.util.TimeConversions._
 import scala.annotation.tailrec
 
 class PoolTimeoutException extends SQLException
+class PoolEmptyException extends SQLException
 
 class PooledConnection(c: Connection, p: ObjectPool) extends DelegatingConnection(c) {
   private var pool: Option[ObjectPool] = Some(p)
@@ -65,6 +65,9 @@ class ThrottledPool(factory: () => Connection, val size: Int, timeout: Duration,
   }
 
   @tailrec final def borrowObject(): Connection = {
+    // short circuit if the pool is empty
+    if (getTotal() == 0) throw new PoolEmptyException
+
     val pair = pool.poll(timeout.inMillis, TimeUnit.MILLISECONDS)
     if (pair == null) throw new PoolTimeoutException
     val (connection, lastUse) = pair
