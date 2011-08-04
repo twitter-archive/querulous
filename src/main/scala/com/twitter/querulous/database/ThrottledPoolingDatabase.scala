@@ -129,12 +129,17 @@ class PoolWatchdogThread(
     var lastTimePoolPopulated = Time.now
     while(true) {
       try {
-        Thread.sleep((repopulateInterval - (Time.now - lastTimePoolPopulated)).inMillis)
+        val timeToSleepInMills = (repopulateInterval - (Time.now - lastTimePoolPopulated)).inMillis
+        if (timeToSleepInMills > 0) {
+          Thread.sleep(timeToSleepInMills)
+        }
         lastTimePoolPopulated = Time.now
         pool.addObjectUnlessFull()
       } catch {
         case t: Throwable => {
-          System.err.println("Watchdog failed to add connection to the pool")
+          System.err.println(Time.now.format("yyyy-MM-dd HH:mm:ss Z") + ": " +
+                             Thread.currentThread().getName() +
+                             " failed to add connection to the pool")
           t.printStackTrace(System.err)
         }
       }
