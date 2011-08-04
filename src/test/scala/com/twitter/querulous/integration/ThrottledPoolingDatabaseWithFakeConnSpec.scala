@@ -12,8 +12,11 @@ import com.twitter.querulous.query.{SqlQueryTimeoutException, TimingOutQueryFact
 object ThrottledPoolingDatabaseWithFakeConnSpec {
   // configure repopulation interval to a minute to avoid conn repopulation when test running
   val testDatabaseFactory = new ThrottledPoolingDatabaseFactory(1, 1.second, 1.second, 60.seconds, Map.empty)
+  // configure repopulation interval to 1 second so that we can verify the watchdog actually works
+  val testRepopulatedDatabaseFactory = new ThrottledPoolingDatabaseFactory(1, 1.second, 1.second, 1.second, Map.empty)
   val testQueryFactory = new TimingOutQueryFactory(new SqlQueryFactory, 500.millis, true)
   val testEvaluatorFactory = new StandardQueryEvaluatorFactory(testDatabaseFactory, testQueryFactory)
+  val testRepopulatedEvaluatorFactory = new StandardQueryEvaluatorFactory(testRepopulatedDatabaseFactory, testQueryFactory)
 }
 
 class ThrottledPoolingDatabaseWithFakeConnSpec extends ConfiguredSpecification {
@@ -59,6 +62,23 @@ class ThrottledPoolingDatabaseWithFakeConnSpec extends ConfiguredSpecification {
         val t0 = Time.now
         queryEvaluator.select("SELECT 1 FROM DUAL") { r => r.getInt(1) } must throwA[PoolEmptyException]
         (Time.now - t0).inMillis must beCloseTo(0L, 100L)
+      } finally {
+        FakeContext.setTimeTakenToExecQuery(host, 0.second)
+      }
+    }
+
+    "repopulate the pool every repopulation interval" >> {
+      val queryEvaluator = testRepopulatedEvaluatorFactory(config)
+
+      queryEvaluator.select("SELECT 1 FROM DUAL") { r => r.getInt(1) } mustEqual List(1)
+      FakeContext.setTimeTakenToExecQuery(host, 1.second)
+      try {
+        // this will cause the underlying connection being destroyed
+        queryEvaluator.select("SELECT 1 FROM DUAL") { r => r.getInt(1) } must throwA[SqlQueryTimeoutException]
+        Thread.sleep(2000)
+        FakeContext.setTimeTakenToExecQuery(host, 0.second)
+        // after repopulation, biz as usual
+        queryEvaluator.select("SELECT 1 FROM DUAL") { r => r.getInt(1) } mustEqual  List(1)
       } finally {
         FakeContext.setTimeTakenToExecQuery(host, 0.second)
       }
