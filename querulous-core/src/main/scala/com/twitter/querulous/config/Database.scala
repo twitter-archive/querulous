@@ -4,14 +4,21 @@ import com.twitter.querulous._
 import com.twitter.util.Duration
 import com.twitter.conversions.time._
 import database._
+import util.Random
 
+trait FailFastPolicyConfig {
+  def highWaterMark: Double
+  def lowWaterMark: Double
+  def openTimeout: Duration
+  def rng: Option[Random]
+}
 
 trait PoolingDatabase {
   def apply(): DatabaseFactory
 }
 
-trait ServiceNameTagged {
-  def apply(serviceName: Option[String]): DatabaseFactory
+trait ServiceNameAndFailFastPolicy {
+  def apply(serviceName: Option[String], ffp: Option[FailFastPolicyConfig]): DatabaseFactory
 }
 
 class ApachePoolingDatabase extends PoolingDatabase {
@@ -28,19 +35,19 @@ class ApachePoolingDatabase extends PoolingDatabase {
   }
 }
 
-class ThrottledPoolingDatabase extends PoolingDatabase with ServiceNameTagged {
+class ThrottledPoolingDatabase extends PoolingDatabase with ServiceNameAndFailFastPolicy {
   var size: Int = 10
   var openTimeout: Duration = 50.millis
   var repopulateInterval: Duration = 500.millis
   var idleTimeout: Duration = 1.minute
 
   def apply() = {
-    apply(None)
+    apply(None, None)
   }
 
-  def apply(serviceName: Option[String]) = {
+  def apply(serviceName: Option[String], ffp: Option[FailFastPolicyConfig]) = {
     new ThrottledPoolingDatabaseFactory(
-      serviceName, size, openTimeout, idleTimeout, repopulateInterval, Map.empty)
+      serviceName, size, openTimeout, idleTimeout, repopulateInterval, Map.empty, ffp)
   }
 }
 
@@ -73,6 +80,8 @@ class Database {
   var memoize: Boolean = true
   var serviceName: Option[String] = None
   def serviceName_=(s: String) { serviceName = Some(s) }
+  var failFastPolicyConfig: Option[FailFastPolicyConfig] = None
+  def failFastPolicyConfig_=(ffp: FailFastPolicyConfig) { failFastPolicyConfig = Some(ffp) }
 
   def apply(stats: StatsCollector): DatabaseFactory = apply(stats, None)
 
@@ -80,7 +89,7 @@ class Database {
 
   def apply(stats: StatsCollector, statsFactory: Option[DatabaseFactory => DatabaseFactory]): DatabaseFactory = {
     var factory = pool.map{ _ match {
-      case p: ServiceNameTagged => p(serviceName)
+      case p: ServiceNameAndFailFastPolicy => p(serviceName, failFastPolicyConfig)
       case p: PoolingDatabase => p()
     }}.getOrElse(new SingleConnectionDatabaseFactory)
 

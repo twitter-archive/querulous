@@ -4,14 +4,84 @@ import java.util.concurrent.{TimeUnit, LinkedBlockingQueue}
 import java.sql.{SQLException, DriverManager, Connection}
 import org.apache.commons.dbcp.{PoolingDataSource, DelegatingConnection}
 import org.apache.commons.pool.{PoolableObjectFactory, ObjectPool}
+import com.twitter.querulous.config.FailFastPolicyConfig
 import com.twitter.util.Duration
 import com.twitter.util.Time
 import scala.annotation.tailrec
-import java.lang.Thread
 import java.util.concurrent.atomic.AtomicInteger
+import java.security.InvalidParameterException
+import util.Random
+import java.lang.{UnsupportedOperationException, Thread}
 
-class PoolTimeoutException extends SQLException
-class PoolEmptyException extends SQLException
+class FailToAcquireConnectionException extends SQLException
+class PoolTimeoutException extends FailToAcquireConnectionException
+class PoolFailFastException extends FailToAcquireConnectionException
+class PoolEmptyException extends PoolFailFastException
+
+/**
+ * determine whether to fail fast when trying to check out a connection from pool
+ */
+trait FailFastPolicy {
+  /**
+   * This method throws PoolFailFastException when it decides to fail fast given the current state
+   * of the underlying database, or it could throw PoolTimeoutException when failing to acquire
+   * a connection within specified time frame
+   *
+   * @param db the database from which we are going to open connections
+   */
+  @throws(classOf[FailToAcquireConnectionException])
+  def failFast(pool: ObjectPool)(f: Duration => Connection): Connection
+}
+
+/**
+ * This policy behaves in the way specified as follows:
+ * When the number of connections in the pool is below the highWaterMark, start to use the timeout
+ * passed in when waiting for a connection; when it is below the lowWaterMark, start to fail
+ * immediately proportional to the number of connections available in the pool, with 100% failure
+ * rate when the pool is empty
+ */
+class FailFastBasedOnNumConnsPolicy(val highWaterMark: Double,  val lowWaterMark: Double,
+  val openTimeout: Duration, val rng: Random) extends FailFastPolicy {
+  if (highWaterMark < lowWaterMark || highWaterMark > 1 || lowWaterMark < 0) {
+    throw new InvalidParameterException("invalid water mark")
+  }
+
+  @throws(classOf[FailToAcquireConnectionException])
+  def failFast(pool: ObjectPool)(f: Duration => Connection) = {
+    pool match {
+      case p: ThrottledPool => {
+        val numConn = p.getTotal()
+        if (numConn == 0) {
+          throw new PoolEmptyException
+        } else if (numConn < p.size * lowWaterMark) {
+          if(numConn < rng.nextDouble() * p.size * lowWaterMark) {
+            throw new PoolFailFastException
+          } else {
+            // should still try to do aggressive timeout at least
+            f(openTimeout)
+          }
+        } else if (numConn < p.size * highWaterMark) {
+          f(openTimeout)
+        } else {
+          f(p.timeout)
+        }
+      }
+      case _ => throw new UnsupportedOperationException("Only support ThrottledPoolingDatabase")
+    }
+  }
+}
+
+object FailFastBasedOnNumConnsPolicy {
+  def apply(openTimeout: Duration): FailFastBasedOnNumConnsPolicy = {
+    apply(0, 0, openTimeout, Some(new Random(System.currentTimeMillis())))
+  }
+
+  def apply(highWaterMark: Double, lowWaterMark: Double, openTimeout: Duration,
+    rng: Option[Random]): FailFastBasedOnNumConnsPolicy = {
+    new FailFastBasedOnNumConnsPolicy(highWaterMark, lowWaterMark, openTimeout,
+      rng.getOrElse(new Random(System.currentTimeMillis())))
+  }
+}
 
 class PooledConnection(c: Connection, p: ObjectPool) extends DelegatingConnection(c) {
   private var pool: Option[ObjectPool] = Some(p)
@@ -43,11 +113,15 @@ class PooledConnection(c: Connection, p: ObjectPool) extends DelegatingConnectio
   }
 }
 
-class ThrottledPool(factory: () => Connection, val size: Int, timeout: Duration,
-  idleTimeout: Duration) extends ObjectPool {
+case class ThrottledPool(factory: () => Connection, val size: Int, timeout: Duration,
+  idleTimeout: Duration, failFastPolicy: FailFastPolicy) extends ObjectPool {
   private val pool = new LinkedBlockingQueue[(Connection, Time)]()
   private val currentSize = new AtomicInteger(0)
   private val numWaiters = new AtomicInteger(0)
+
+  def this(factory: () => Connection, size: Int, timeout: Duration, idleTimeout: Duration) = {
+    this(factory, size, timeout, idleTimeout, FailFastBasedOnNumConnsPolicy(timeout))
+  }
 
   for (i <- (0.until(size))) addObject()
 
@@ -69,17 +143,17 @@ class ThrottledPool(factory: () => Connection, val size: Int, timeout: Duration,
   final def borrowObject(): Connection = {
     numWaiters.incrementAndGet()
     try {
-      borrowObjectInternal()
+      failFastPolicy.failFast(this)(borrowObjectInternal)
     } finally {
       numWaiters.decrementAndGet()
     }
   }
 
-  @tailrec private def borrowObjectInternal(): Connection = {
+  @tailrec private def borrowObjectInternal(openTimeout: Duration): Connection = {
     // short circuit if the pool is empty
     if (getTotal() == 0) throw new PoolEmptyException
 
-    val pair = pool.poll(timeout.inMillis, TimeUnit.MILLISECONDS)
+    val pair = pool.poll(openTimeout.inMillis, TimeUnit.MILLISECONDS)
     if (pair == null) throw new PoolTimeoutException
     val (connection, lastUse) = pair
 
@@ -88,7 +162,7 @@ class ThrottledPool(factory: () => Connection, val size: Int, timeout: Duration,
       try { connection.close() } catch { case _: SQLException => }
       // note: dbcp handles object invalidation here.
       addObjectIfEmpty()
-      borrowObjectInternal()
+      borrowObjectInternal(openTimeout)
     } else {
       connection
     }
@@ -170,11 +244,19 @@ class ThrottledPoolingDatabaseFactory(
   openTimeout: Duration,
   idleTimeout: Duration,
   repopulateInterval: Duration,
-  defaultUrlOptions: Map[String, String]) extends DatabaseFactory {
+  defaultUrlOptions: Map[String, String],
+  failFastPolicyConfig: Option[FailFastPolicyConfig]) extends DatabaseFactory {
+
+  // the default is the one with both highWaterMark and lowWaterMark of 0
+  // in this case, PoolEmptyException will be thrown when the number of connections in the pool
+  // is zero; otherwise, it will behave the same way as if this policy is not applied
+  private val failFastPolicy = failFastPolicyConfig map {pc =>
+    FailFastBasedOnNumConnsPolicy(pc.highWaterMark, pc.lowWaterMark, pc.openTimeout, pc.rng)
+  } getOrElse (FailFastBasedOnNumConnsPolicy(openTimeout))
 
   def this(size: Int, openTimeout: Duration, idleTimeout: Duration, repopulateInterval: Duration,
     defaultUrlOptions: Map[String, String]) = {
-    this(None, size, openTimeout, idleTimeout, repopulateInterval, defaultUrlOptions)
+    this(None, size, openTimeout, idleTimeout, repopulateInterval, defaultUrlOptions, None)
   }
 
   def this(size: Int, openTimeout: Duration, idleTimeout: Duration,
@@ -192,7 +274,7 @@ class ThrottledPoolingDatabaseFactory(
     }
 
     new ThrottledPoolingDatabase(serviceName, dbhosts, dbname, username, password, finalUrlOptions,
-      size, openTimeout, idleTimeout, repopulateInterval)
+      size, openTimeout, idleTimeout, repopulateInterval, failFastPolicy)
   }
 }
 
@@ -206,11 +288,13 @@ class ThrottledPoolingDatabase(
   numConnections: Int,
   val openTimeout: Duration,
   idleTimeout: Duration,
-  repopulateInterval: Duration) extends Database {
+  repopulateInterval: Duration,
+  val failFastPolicy: FailFastPolicy) extends Database {
 
   Class.forName("com.mysql.jdbc.Driver")
 
-  private val pool = new ThrottledPool(mkConnection, numConnections, openTimeout, idleTimeout)
+  private[database] val pool = new ThrottledPool(mkConnection, numConnections, openTimeout,
+    idleTimeout, failFastPolicy)
   private val poolingDataSource = new PoolingDataSource(pool)
   poolingDataSource.setAccessToUnderlyingConnectionAllowed(true)
   new PoolWatchdogThread(pool, hosts, repopulateInterval).start()
@@ -226,7 +310,7 @@ class ThrottledPoolingDatabase(
     extraUrlOptions: Map[String, String], numConnections: Int, openTimeout: Duration,
     idleTimeout: Duration, repopulateInterval: Duration) = {
     this(None, hosts, name, username, password, extraUrlOptions, numConnections, openTimeout,
-      idleTimeout, repopulateInterval)
+      idleTimeout, repopulateInterval, FailFastBasedOnNumConnsPolicy(openTimeout))
   }
 
   def open() = {
