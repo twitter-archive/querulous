@@ -29,7 +29,7 @@ with SubversionPublisher {
     with SubversionPublisher
 
   val utilVersion    = "1.11.8"
-  val finagleVersion = "1.9.2"
+  val finagleVersion = "1.9.5"
 
   class CoreProject(info: ProjectInfo) extends StandardLibraryProject(info) with Defaults {
     val utilCore  = "com.twitter"  % "util-core"            % utilVersion

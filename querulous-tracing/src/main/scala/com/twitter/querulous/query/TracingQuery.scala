@@ -10,7 +10,9 @@ import java.net.{UnknownHostException, InetSocketAddress, InetAddress}
  * This data is then processed and sent off with a Finagle compatible tracer.
  */
 class TracingQuery(query: Query, connection: Connection, queryClass: QueryClass,
-                   serviceName: String, tracer: Tracer) extends QueryProxy(query: Query) {
+                   serviceName: String, tracerFactory: Tracer.Factory) extends QueryProxy(query: Query) {
+
+  val tracer = tracerFactory()
 
   override protected def delegate[A](f: => A) = {
     Trace.unwind {
@@ -46,11 +48,11 @@ class TracingQuery(query: Query, connection: Connection, queryClass: QueryClass,
   }
 }
 
-class TracingQueryFactory(queryFactory: QueryFactory, serviceName: String, tracer: Tracer)
-  extends QueryFactory {
+class TracingQueryFactory(queryFactory: QueryFactory, serviceName: String,
+                          tracerFactory: Tracer.Factory) extends QueryFactory {
 
   def apply(connection: Connection, queryClass: QueryClass, query: String, params: Any*) = {
     new TracingQuery(queryFactory(connection, queryClass, query, params: _*),
-      connection, queryClass, serviceName, tracer)
+      connection, queryClass, serviceName, tracerFactory)
   }
 }
