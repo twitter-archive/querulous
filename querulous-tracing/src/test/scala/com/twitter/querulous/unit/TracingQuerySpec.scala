@@ -13,10 +13,9 @@ class TracingQuerySpec extends Specification with JMocker {
       val queryString = "select * from users"
       val tracer = mock[Tracer]
       val connection = mock[Connection]
-      Trace.pushId(TraceId(Some(SpanId(1)), None, SpanId(1), None))
+      Trace.pushId(TraceId(Some(SpanId(1)), None, SpanId(1), Some(true)))
 
       expect {
-        one(tracer).sampleTrace(a[TraceId])
         one(connection).getClientInfo("ClientHostname")
         one(connection).prepareStatement("select * from users\n/*\ntrace_id=0000000000000001\n*/")
         exactly(5).of(tracer).record(a[Record])
