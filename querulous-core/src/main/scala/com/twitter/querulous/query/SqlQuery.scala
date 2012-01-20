@@ -136,12 +136,18 @@ class SqlQuery(connection: Connection, val query: String, params: Any*) extends 
     if (annotations.isEmpty) {
       ""
     } else {
+      val builder = new StringBuilder
+      // wrap in a c style comment.
+      builder.append("\n/*\n")
       // convert into key values with endline
-      val kv = annotations.map { entry => entry._1 + "=" + entry._2 + "\n" }
-      // wrap in a c style comment. fold up each kv pair into a block
-      "\n/*\n" +
-      kv.foldLeft("")((str, entry) => str + entry) +
-      "*/"
+      annotations.foreach { entry =>
+        builder.append(entry._1)
+        builder.append("=")
+        builder.append(entry._2)
+        builder.append("\n")
+      }
+      builder.append("*/")
+      builder.toString()
     }
   }
 
