@@ -48,8 +48,34 @@ class SqlQuery(connection: Connection, val query: String, params: Any*) extends 
   }
 
   var paramsInitialized = false
-  var statement = buildStatement(connection, query, params: _*)
+  // we need to delay creation of the statement till it's needed
+  // so users can add annotations if they want to
+  var statementInstance: Option[PreparedStatement] = None
+  var additionalParams: Seq[Seq[Any]] = Seq[Seq[Any]]()
   var batchMode = false
+
+  /**
+   * Get the statement from the connection, query and params specified.
+   */
+  def statement = {
+    statementInstance.getOrElse {
+      val s = buildStatement(connection, query, params: _*)
+      // if the user has added more params we need to add those as separate batches
+      if (!additionalParams.isEmpty) {
+        // add a batch if params have been initialized already
+        if (paramsInitialized) s.addBatch()
+
+        // add a batch for each of the additional params
+        additionalParams foreach { p =>
+          setBindVariable(s, 1, p)
+          s.addBatch()
+        }
+      }
+
+      statementInstance = Some(s)
+      s
+    }
+  }
 
   def select[A](f: ResultSet => A): Seq[A] = {
     withStatement {
@@ -68,11 +94,7 @@ class SqlQuery(connection: Connection, val query: String, params: Any*) extends 
   }
 
   def addParams(params: Any*) = {
-    if(paramsInitialized && !batchMode) {
-      statement.addBatch()
-    }
-    setBindVariable(statement, 1, params)
-    statement.addBatch()
+    additionalParams = additionalParams :+ params
     batchMode = true
   }
 
@@ -107,8 +129,24 @@ class SqlQuery(connection: Connection, val query: String, params: Any*) extends 
     }
   }
 
+  /**
+   * Convert the annotations into an sql comment.
+   */
+  private def annotationsAsComment: String = {
+    if (annotations.isEmpty) {
+      ""
+    } else {
+      // convert into key values with endline
+      val kv = annotations.map { entry => entry._1 + "=" + entry._2 + "\n" }
+      // wrap in a c style comment. fold up each kv pair into a block
+      "\n/*\n" +
+      kv.foldLeft("")((str, entry) => str + entry) +
+      "*/"
+    }
+  }
+
   private def buildStatement(connection: Connection, query: String, params: Any*) = {
-    val statement = connection.prepareStatement(expandArrayParams(query, params: _*))
+    val statement = connection.prepareStatement(expandArrayParams(query + annotationsAsComment, params: _*))
     setBindVariable(statement, 1, params)
     statement
   }

@@ -20,6 +20,8 @@ class TracingQuery(query: Query, connection: Connection, queryClass: QueryClass,
       val sampled = Trace.id.sampled orElse tracer.sampleTrace(nextId)
       Trace.pushId(nextId.copy(sampled = sampled))
 
+      query.addAnnotation("trace_id", nextId.traceId.toString())
+
       try {
         // don't know the port
         Trace.recordClientAddr(new InetSocketAddress(
