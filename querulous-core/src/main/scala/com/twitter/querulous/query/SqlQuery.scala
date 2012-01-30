@@ -141,15 +141,20 @@ class SqlQuery(connection: Connection, val query: String, params: Any*) extends 
       builder.append("\n/*\n")
       // convert into key values with endline
       annotations.foreach { entry =>
-        builder.append(entry._1)
+        builder.append(escapeComment(entry._1))
         builder.append("=")
-        builder.append(entry._2)
+        builder.append(escapeComment(entry._2))
         builder.append("\n")
       }
       builder.append("*/")
       builder.toString()
     }
   }
+
+  /**
+   * escape the comments in the user input so we don't close the comment early
+   */
+  private def escapeComment(s: String) = s.replace("/*", "\\/\\*").replace("*/", "\\*\\/")
 
   private def buildStatement(connection: Connection, query: String, params: Any*) = {
     val statement = connection.prepareStatement(expandArrayParams(query + annotationsAsComment, params: _*))
