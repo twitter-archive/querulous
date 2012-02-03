@@ -137,16 +137,17 @@ class SqlQuery(connection: Connection, val query: String, params: Any*) extends 
       ""
     } else {
       val builder = new StringBuilder
-      // wrap in a c style comment.
-      builder.append("\n/*\n")
-      // convert into key values with endline
-      annotations.foreach { entry =>
+      // wrap in a c style comment. add ~ as market that this is an annotations comment
+      // write as json
+      builder.append(" /*~ {\"")
+      annotations.zipWithIndex.foreach { case (entry, pos) =>
         builder.append(escapeComment(entry._1))
-        builder.append("=")
+        builder.append("\":\"")
         builder.append(escapeComment(entry._2))
-        builder.append("\n")
+        builder.append("\"")
+        if (pos+1 < annotations.size) builder.append(",\"")
       }
-      builder.append("*/")
+      builder.append("}*/")
       builder.toString()
     }
   }

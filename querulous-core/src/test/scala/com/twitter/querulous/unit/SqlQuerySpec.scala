@@ -152,7 +152,7 @@ class SqlQuerySpec extends Specification with JMocker with ClassMocker {
       val statement = mock[PreparedStatement]
 
       expect {
-        one(connection).prepareStatement("select * from table\n/*\nkey=value\nkey2=\\*\\/select 1\n*/") willReturn statement then
+        one(connection).prepareStatement("select * from table /*~ {\"key\":\"value\",\"key2\":\"\\*\\/select 1\"}*/") willReturn statement then
         one(statement).executeQuery() then
         one(statement).getResultSet
       }

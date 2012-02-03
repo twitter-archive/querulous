@@ -8,9 +8,10 @@ class TracingAsyncQueryEvaluator extends AsyncQueryEvaluator {
 
   var tracerFactory: tracing.Tracer.Factory = tracing.NullTracer.factory
   var serviceName: String = ""
+  var annotateQuery: Boolean = false
 
   protected override def newQueryFactory(stats: querulous.StatsCollector) = {
-    new TracingQueryFactory(super.newQueryFactory(stats), serviceName, tracerFactory())
+    new TracingQueryFactory(super.newQueryFactory(stats), serviceName, tracerFactory(), annotateQuery)
   }
 
 }

@@ -17,13 +17,13 @@ class TracingQuerySpec extends Specification with JMocker {
 
       expect {
         one(connection).getClientInfo("ClientHostname")
-        one(connection).prepareStatement("select * from users\n/*\ntrace_id=0000000000000001\n*/")
+        one(connection).prepareStatement("select * from users /*~ {\"trace_id\":\"0000000000000001\"}*/")
         exactly(5).of(tracer).record(a[Record])
       }
 
       val query = new SqlQuery(connection, queryString)
       val tracingQuery = new TracingQuery(query, connection, QueryClass.Select,
-        "service", tracer)
+        "service", tracer, true)
       tracingQuery.execute()
     }
   }
