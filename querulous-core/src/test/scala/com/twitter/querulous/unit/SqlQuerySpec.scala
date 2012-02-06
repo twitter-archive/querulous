@@ -152,14 +152,17 @@ class SqlQuerySpec extends Specification with JMocker with ClassMocker {
       val statement = mock[PreparedStatement]
 
       expect {
-        one(connection).prepareStatement("select * from table /*~ {\"key\":\"value\",\"key2\":\"\\*\\/select 1\"}*/") willReturn statement then
+        one(connection).prepareStatement("select * from table /*~{\"key\" : \"value2\", " +
+          "\"key2\" : \"*\\/select 1\", \"key3\" : \"{:}\"}*/") willReturn statement then
         one(statement).executeQuery() then
         one(statement).getResultSet
       }
 
       val query = new SqlQuery(connection, queryString)
       query.addAnnotation("key", "value")
+      query.addAnnotation("key", "value2") // we'll only keep this
       query.addAnnotation("key2", "*/select 1") // trying to end the comment early
+      query.addAnnotation("key3", "{:}") // going all json on your ass
       query.select(result => fail("should not return any data"))
     }
   }

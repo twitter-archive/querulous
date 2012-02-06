@@ -17,7 +17,8 @@ class TracingQuerySpec extends Specification with JMocker {
 
       expect {
         one(connection).getClientInfo("ClientHostname")
-        one(connection).prepareStatement("select * from users /*~ {\"trace_id\":\"0000000000000001\"}*/")
+        one(connection).prepareStatement("select * from users /*~{\"client_host\" : \"127.0.0.1\", " +
+          "\"service_name\" : \"service\", \"trace_id\" : \"0000000000000001\"}*/")
         exactly(5).of(tracer).record(a[Record])
       }
 

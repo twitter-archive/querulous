@@ -4,6 +4,7 @@ import java.sql.{Connection, PreparedStatement, ResultSet, SQLException, Timesta
 import java.lang.reflect.{Field, Modifier}
 import java.util.regex.Pattern
 import scala.collection.mutable
+import json.JSONObject
 
 class SqlQueryFactory extends QueryFactory {
   def apply(connection: Connection, queryClass: QueryClass, query: String, params: Any*) = {
@@ -136,26 +137,9 @@ class SqlQuery(connection: Connection, val query: String, params: Any*) extends 
     if (annotations.isEmpty) {
       ""
     } else {
-      val builder = new StringBuilder
-      // wrap in a c style comment. add ~ as market that this is an annotations comment
-      // write as json
-      builder.append(" /*~ {\"")
-      annotations.zipWithIndex.foreach { case (entry, pos) =>
-        builder.append(escapeComment(entry._1))
-        builder.append("\":\"")
-        builder.append(escapeComment(entry._2))
-        builder.append("\"")
-        if (pos+1 < annotations.size) builder.append(",\"")
-      }
-      builder.append("}*/")
-      builder.toString()
+      " /*~" + new JSONObject(annotations.toMap).toString() + "*/"
     }
   }
-
-  /**
-   * escape the comments in the user input so we don't close the comment early
-   */
-  private def escapeComment(s: String) = s.replace("/*", "\\/\\*").replace("*/", "\\*\\/")
 
   private def buildStatement(connection: Connection, query: String, params: Any*) = {
     val statement = connection.prepareStatement(expandArrayParams(query + annotationsAsComment, params: _*))

@@ -15,7 +15,7 @@ import java.nio.ByteBuffer
  * @param tracer The tracer we want to send traces to
  * @param annotateQuery Do we want to annotate the query or not? Annotate attaches information about this
  * trace to the queries we send. For example we attach the trace id so that we can look up
- * information about where this query comes from.
+ * information about where this query comes from.w
  */
 class TracingQuery(query: Query,
                    connection: Connection,
@@ -32,18 +32,19 @@ class TracingQuery(query: Query,
       val sampled = Trace.id.sampled orElse tracer.sampleTrace(nextId)
       Trace.pushId(nextId.copy(sampled = sampled))
 
-      // do we want to annotate this query with the trace id?
-      // only do it if the user enabled and we have decided to sample this trace
-      if (annotateQuery && sampled.getOrElse(false)) {
-        query.addAnnotation("trace_id", nextId.traceId.toString())
-      }
+      val address = getLocalAddress(connection)
+      address foreach { Trace.recordClientAddr(_) }
 
-      try {
-        // don't know the port
-        Trace.recordClientAddr(new InetSocketAddress(
-          InetAddress.getByName(connection.getClientInfo("ClientHostname")), 0))
-      } catch {
-        case e: UnknownHostException => () // just don't set it if we can't find it
+      // do we want to annotate this query at all?
+      if (annotateQuery) {
+        // set the ip and service name to help debugging
+        address foreach { addr => query.addAnnotation("client_host", addr.getAddress.getHostAddress) }
+        query.addAnnotation("service_name", serviceName)
+
+        // only set trace id if we have decided to sample this trace
+        if (sampled.getOrElse(false)) {
+          query.addAnnotation("trace_id", nextId.traceId.toString())
+        }
       }
 
       // we want to know which query caused these timings
@@ -60,6 +61,16 @@ class TracingQuery(query: Query,
       Trace.record(Annotation.ClientRecv())
       rv
     }
+  }
+
+  def getLocalAddress(connection: Connection): Option[InetSocketAddress] = {
+    try {
+        // don't know the port
+        Some(new InetSocketAddress(
+          InetAddress.getByName(connection.getClientInfo("ClientHostname")), 0))
+      } catch {
+        case e: UnknownHostException => None
+      }
   }
 }
 
