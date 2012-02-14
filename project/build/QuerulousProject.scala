@@ -6,21 +6,21 @@ with DefaultRepos
 with SubversionPublisher {
 
   lazy val coreProject = project(
-    "querulous-core", "querulous-core",
+    "querulous-core", "querulous-core_2.9.1",
     new CoreProject(_))
 
   /**
    * finagle compatible tracing for database requests
    */
   lazy val tracingProject = project(
-    "querulous-tracing", "querulous-tracing",
+    "querulous-tracing", "querulous-tracing_2.9.1",
     new TracingProject(_), coreProject)
 
   /**
    * Ostrich stats provider for query stats collection
    */
   lazy val ostrich4Project = project(
-    "querulous-ostrich4", "querulous-ostrich4",
+    "querulous-ostrich4", "querulous-ostrich4_2.9.1",
     new Ostrich4Project(_), coreProject)
 
   trait Defaults
