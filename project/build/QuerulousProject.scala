@@ -32,15 +32,15 @@ with SubversionPublisher {
   val finagleVersion = "1.11.0"
 
   class CoreProject(info: ProjectInfo) extends StandardLibraryProject(info) with Defaults {
-    val utilCore  = "com.twitter"  % "util-core"            % utilVersion
+    val utilCore  = "com.twitter"  % "util-core_2.9.1"      % utilVersion
     val dbcp      = "commons-dbcp" % "commons-dbcp"         % "1.4"
     val mysqljdbc = "mysql"        % "mysql-connector-java" % "5.1.18"
     val pool      = "commons-pool" % "commons-pool"         % "1.5.4"
 
-    val utilEval   = "com.twitter"             % "util-eval"          % utilVersion % "test"
-    val scalaTools = "org.scala-lang"          % "scala-compiler"     % "2.8.1"     % "test"
+    val utilEval   = "com.twitter"             % "util-eval_2.9.1"    % utilVersion % "test"
+    val scalaTools = "org.scala-lang"          % "scala-compiler"     % "2.9.1"     % "test"
     val hamcrest   = "org.hamcrest"            % "hamcrest-all"       % "1.1"       % "test"
-    val specs      = "org.scala-tools.testing" % "specs_2.8.0"        % "1.6.5"     % "test"
+    val specs      = "org.scala-tools.testing" % "specs_2.9.1"        % "1.6.9"     % "test"
     val objenesis  = "org.objenesis"           % "objenesis"          % "1.1"       % "test"
     val jmock      = "org.jmock"               % "jmock"              % "2.4.0"     % "test"
     val cglib      = "cglib"                   % "cglib"              % "2.2"       % "test"
@@ -49,12 +49,12 @@ with SubversionPublisher {
   }
 
   class TracingProject(info: ProjectInfo) extends StandardLibraryProject(info) with Defaults {
-    val finagle = "com.twitter" % "finagle-core" % finagleVersion
+    val finagle = "com.twitter" % "finagle-core_2.9.1" % finagleVersion
   }
 
   class Ostrich4Project(info: ProjectInfo) extends StandardLibraryProject(info) with Defaults {
     // rely on finagle to pull in ostrich, for compat w/ tracing version.
-    val ostrich = "com.twitter" % "finagle-ostrich4" % finagleVersion
+    val ostrich = "com.twitter" % "finagle-ostrich4_2.9.1" % finagleVersion
   }
 
   override def subversionRepository = Some("https://svn.twitter.biz/maven-public/")
