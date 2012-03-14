@@ -8,7 +8,7 @@ class DaemonThreadFactory(nameSuffix : String) extends ThreadFactory {
   val threadNumber = new AtomicInteger(1)
 
   def newThread(r: Runnable) = {
-    val thread = new Thread(group, r, "querulous-" + nameSuffix + "-" + threadNumber.getAndIncrement())
+    val thread = new Thread(group, r, "querulous-%s-%d".format(nameSuffix, threadNumber.getAndIncrement()))
     if (!thread.isDaemon) {
       thread.setDaemon(true)
     }
