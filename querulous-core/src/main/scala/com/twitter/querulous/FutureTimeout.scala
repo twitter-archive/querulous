@@ -12,7 +12,7 @@ class FutureTimeout(poolSize: Int, queueSize: Int) {
     60,
     TimeUnit.SECONDS,
     new LinkedBlockingQueue[Runnable](queueSize),
-    new DaemonThreadFactory()
+    new DaemonThreadFactory("futureTimeout")
   )
 
   class Task[T](f: => T)(onTimeout: T => Unit) extends Callable[T] {
