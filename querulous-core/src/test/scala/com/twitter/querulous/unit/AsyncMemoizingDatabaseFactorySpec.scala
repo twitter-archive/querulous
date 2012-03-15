@@ -3,6 +3,7 @@ package com.twitter.querulous.unit
 import org.specs.mock.JMocker
 import org.specs.Specification
 import com.twitter.querulous.async.{AsyncDatabase, AsyncDatabaseFactory, AsyncMemoizingDatabaseFactory}
+import com.twitter.querulous.database.Database
 
 class AsyncMemoizingDatabaseFactorySpec extends Specification with JMocker {
   val username = "username"
