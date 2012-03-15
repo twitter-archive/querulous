@@ -8,11 +8,11 @@ import com.twitter.util.{Try, Throw, Future, Promise}
 import com.twitter.util.{FuturePool, ExecutorServiceFuturePool, JavaTimer, TimeoutException}
 import com.twitter.querulous.{StatsCollector, NullStatsCollector, DaemonThreadFactory}
 import com.twitter.querulous.database.{Database, DatabaseFactory}
-
+import com.twitter.querulous.config
 
 class BlockingDatabaseWrapperFactory(
-  workPool: => FuturePool,
-  checkoutPool: => FuturePool,
+  workPool: config.FuturePool,
+  checkoutPool: config.FuturePool,
   factory: DatabaseFactory,
   stats: StatsCollector = NullStatsCollector)
 extends AsyncDatabaseFactory {
@@ -25,8 +25,8 @@ extends AsyncDatabaseFactory {
     driverName: String
   ): AsyncDatabase = {
     new BlockingDatabaseWrapper(
-      workPool,
-      checkoutPool,
+      workPool(),
+      checkoutPool(),
       factory(hosts, name, username, password, urlOptions, driverName),
       stats
     )

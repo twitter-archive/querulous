@@ -47,14 +47,20 @@ class AsyncQueryEvaluator {
       if (!singletonFactory) memoizedFactory = None
 
       memoizedFactory = memoizedFactory orElse {
-        val db = new async.BlockingDatabaseWrapperFactory(
-          workPool(),
-          checkoutPool(),
+        var dbFactory: async.AsyncDatabaseFactory = new async.BlockingDatabaseWrapperFactory(
+          workPool,
+          checkoutPool,
           newDatabaseFactory(stats, dbStatsFactory),
           stats
         )
 
-        Some(new async.StandardAsyncQueryEvaluatorFactory(db, newQueryFactory(stats, queryStatsFactory)))
+        if (database.memoize) {
+          // Ensure AsyncDatabase gets memoized. This ensures there is exactly one checkout pool
+          // per actual db connection pool.
+          dbFactory = new async.AsyncMemoizingDatabaseFactory(dbFactory)
+        }
+
+        Some(new async.StandardAsyncQueryEvaluatorFactory(dbFactory, newQueryFactory(stats, queryStatsFactory)))
       }
 
       memoizedFactory.get
