@@ -1,10 +1,13 @@
-package com.twitter.querulous.database
+package com.twitter.querulous.async
 
 import scala.collection.mutable
 
-class MemoizingDatabaseFactory(val databaseFactory: DatabaseFactory) extends DatabaseFactory {
+/**
+ *  Like MemoizingDatabaseFactory, but meant for async querulous.
+ */
+class AsyncMemoizingDatabaseFactory(val databaseFactory: AsyncDatabaseFactory) extends AsyncDatabaseFactory {
   // TODO: Use CacheBuilder after upgrading the Guava dependency to >= v10.
-  private val databases = new mutable.HashMap[String, Database] with mutable.SynchronizedMap[String, Database]
+  private val databases = new mutable.HashMap[String, AsyncDatabase] with mutable.SynchronizedMap[String, AsyncDatabase]
 
   def apply(dbhosts: List[String], dbname: String, username: String, password: String, urlOptions: Map[String, String], driverName: String) = synchronized {
     databases.getOrElseUpdate(
