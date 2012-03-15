@@ -48,8 +48,8 @@ class AsyncQueryEvaluator {
 
       memoizedFactory = memoizedFactory orElse {
         var dbFactory: async.AsyncDatabaseFactory = new async.BlockingDatabaseWrapperFactory(
-          workPool(),
-          checkoutPool(),
+          workPool,
+          checkoutPool,
           newDatabaseFactory(stats, dbStatsFactory),
           stats
         )
