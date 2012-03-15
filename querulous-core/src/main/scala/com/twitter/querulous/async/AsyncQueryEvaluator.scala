@@ -4,7 +4,6 @@ import java.util.concurrent.{Executors, LinkedBlockingQueue, TimeUnit, ThreadPoo
 import java.sql.ResultSet
 import com.twitter.util.{Future, FuturePool}
 import com.twitter.querulous.config
-import com.twitter.querulous.config.{Connection => ConnectionConfig}
 import com.twitter.querulous.DaemonThreadFactory
 import com.twitter.querulous.evaluator._
 import com.twitter.querulous.query.{QueryClass, SqlQueryFactory}
@@ -61,7 +60,7 @@ trait AsyncQueryEvaluatorFactory {
     apply(dbhosts, null, username, password, Map[String,String](), Database.DEFAULT_DRIVER_NAME)
   }
 
-  def apply(connection: ConnectionConfig): AsyncQueryEvaluator = {
+  def apply(connection: config.Connection): AsyncQueryEvaluator = {
     apply(connection.hostnames.toList, connection.database, connection.username, connection.password, connection.urlOptions, connection.driverName)
   }
 }

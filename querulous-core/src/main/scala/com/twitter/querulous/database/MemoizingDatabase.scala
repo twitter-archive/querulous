@@ -3,6 +3,7 @@ package com.twitter.querulous.database
 import scala.collection.mutable
 
 class MemoizingDatabaseFactory(val databaseFactory: DatabaseFactory) extends DatabaseFactory {
+  // TODO: Use CacheBuilder after upgrading the Guava dependency to >= v10.
   private val databases = new mutable.HashMap[String, Database] with mutable.SynchronizedMap[String, Database]
 
   def apply(dbhosts: List[String], dbname: String, username: String, password: String, urlOptions: Map[String, String], driverName: String) = synchronized {
