@@ -36,7 +36,8 @@ class BlockingDatabaseWrapper(
   protected[async] val database: Database,
   stats: StatsCollector = NullStatsCollector)
 extends AsyncDatabase {
-  private val executor = Executors.newFixedThreadPool(workPoolSize, new DaemonThreadFactory("asyncWorkPool"))
+  private val executor =
+      Executors.newFixedThreadPool(workPoolSize, new DaemonThreadFactory("asyncWorkPool-" + database.hosts.mkString(",")))
   private val workPool = FuturePool(executor)
 
   def withConnection[R](f: Connection => R): Future[R] = {
