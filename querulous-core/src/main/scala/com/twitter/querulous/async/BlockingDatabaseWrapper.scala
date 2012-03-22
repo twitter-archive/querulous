@@ -1,19 +1,16 @@
 package com.twitter.querulous.async
 
 import java.util.logging.{Logger, Level}
-import java.util.concurrent.{Executors, RejectedExecutionException}
-import java.util.concurrent.atomic.{AtomicInteger, AtomicBoolean}
+import java.util.concurrent.Executors
 import java.sql.Connection
-import com.twitter.util.{Try, Throw, Future, Promise}
-import com.twitter.util.{FuturePool, ExecutorServiceFuturePool, JavaTimer, TimeoutException}
+import com.twitter.util.{Future, FuturePool}
 import com.twitter.querulous.{StatsCollector, NullStatsCollector, DaemonThreadFactory}
 import com.twitter.querulous.database.{Database, DatabaseFactory}
 import com.twitter.querulous.config
 
 class BlockingDatabaseWrapperFactory(
   workPoolSize: Int,
-  factory: DatabaseFactory,
-  stats: StatsCollector = NullStatsCollector)
+  factory: DatabaseFactory)
 extends AsyncDatabaseFactory {
   def apply(
     hosts: List[String],
@@ -25,16 +22,14 @@ extends AsyncDatabaseFactory {
   ): AsyncDatabase = {
     new BlockingDatabaseWrapper(
       workPoolSize,
-      factory(hosts, name, username, password, urlOptions, driverName),
-      stats
+      factory(hosts, name, username, password, urlOptions, driverName)
     )
   }
 }
 
 class BlockingDatabaseWrapper(
   workPoolSize: Int,
-  protected[async] val database: Database,
-  stats: StatsCollector = NullStatsCollector)
+  protected[async] val database: Database)
 extends AsyncDatabase {
   private val executor =
       Executors.newFixedThreadPool(workPoolSize, new DaemonThreadFactory("asyncWorkPool-" + database.hosts.mkString(",")))

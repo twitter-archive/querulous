@@ -40,8 +40,7 @@ class AsyncQueryEvaluator {
       memoizedFactory = memoizedFactory orElse {
         var dbFactory: async.AsyncDatabaseFactory = new async.BlockingDatabaseWrapperFactory(
           workPoolSize.get,  // workPoolSize is a required setting.
-          newDatabaseFactory(stats, dbStatsFactory),
-          stats
+          newDatabaseFactory(stats, dbStatsFactory)
         )
 
         if (database.memoize) {
