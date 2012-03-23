@@ -45,6 +45,13 @@ extends AsyncDatabase {
       workPoolSize, new DaemonThreadFactory("asyncWorkPool-" + database.hosts.mkString(","))))
   private val openTimeout = database.openTimeout
 
+  // Basically all we need to do is offload the real work to workPool. However, there is one
+  // complication - enforcement of DB open timeout. If a connection is not available, most
+  // likely neither is a thread to do the work, so requests would queue up in the future pool.
+  // We need to ensure requests don't stick around in the queue for more than openTimeout duration.
+  // To do this, we use a trick implemented in the ExecutorServiceFuturePool for cancellation - i.e.,
+  // setup a timeout and cancel the request iff it hasn't already started executing, coordinating
+  // via an AtomicBoolean.
   def withConnection[R](f: Connection => R): Future[R] = {
     val startCoordinator = new AtomicBoolean(true)
     val future = workPool {
