@@ -3,16 +3,15 @@ package com.twitter.querulous.async
 import java.util.concurrent.{Executors, LinkedBlockingQueue, TimeUnit, ThreadPoolExecutor}
 import java.sql.ResultSet
 import com.twitter.util.{Future, FuturePool}
-import com.twitter.querulous.config.{Connection => ConnectionConfig}
+import com.twitter.querulous.config
 import com.twitter.querulous.DaemonThreadFactory
 import com.twitter.querulous.evaluator._
 import com.twitter.querulous.query.{QueryClass, SqlQueryFactory}
 import com.twitter.querulous.database.{ThrottledPoolingDatabaseFactory, Database}
 import com.twitter.conversions.time._
 
-
-object AsyncQueryEvaluator extends AsyncQueryEvaluatorFactory {
-  lazy val defaultWorkPool = FuturePool(Executors.newCachedThreadPool(new DaemonThreadFactory))
+object AsyncQueryEvaluator {
+  lazy val defaultWorkPool = FuturePool(Executors.newCachedThreadPool(new DaemonThreadFactory("asyncWorkPool")))
   lazy val defaultMaxWaiters = Int.MaxValue
 
   def checkoutPool(maxWaiters: Int) = {
@@ -22,29 +21,8 @@ object AsyncQueryEvaluator extends AsyncQueryEvaluatorFactory {
         1, /* max size */
         0, /* ignored, since the sizes are the same */
         TimeUnit.MILLISECONDS, /* similarly ignored */
-        new LinkedBlockingQueue(maxWaiters)))
-  }
-
-  private def createEvaluatorFactory() = {
-    new StandardAsyncQueryEvaluatorFactory(
-      new BlockingDatabaseWrapperFactory(
-        defaultWorkPool,
-        checkoutPool(defaultMaxWaiters),
-        new ThrottledPoolingDatabaseFactory(10, 100.millis, 10.seconds, 1.second)
-      ),
-      new SqlQueryFactory
-    )
-  }
-
-  def apply(
-    dbhosts: List[String],
-    dbname: String,
-    username: String,
-    password: String,
-    urlOptions: Map[String, String],
-    driverName: String
-  ): AsyncQueryEvaluator = {
-    createEvaluatorFactory()(dbhosts, dbname, username, password, urlOptions, driverName)
+        new LinkedBlockingQueue[Runnable](maxWaiters),
+        new DaemonThreadFactory("asyncCheckoutPool")))
   }
 }
 
@@ -82,7 +60,7 @@ trait AsyncQueryEvaluatorFactory {
     apply(dbhosts, null, username, password, Map[String,String](), Database.DEFAULT_DRIVER_NAME)
   }
 
-  def apply(connection: ConnectionConfig): AsyncQueryEvaluator = {
+  def apply(connection: config.Connection): AsyncQueryEvaluator = {
     apply(connection.hostnames.toList, connection.database, connection.username, connection.password, connection.urlOptions, connection.driverName)
   }
 }

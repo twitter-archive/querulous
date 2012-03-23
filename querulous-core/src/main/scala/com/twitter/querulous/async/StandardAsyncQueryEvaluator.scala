@@ -8,7 +8,7 @@ import com.twitter.querulous.evaluator.{Transaction, ParamsApplier}
 
 class StandardAsyncQueryEvaluatorFactory(
   databaseFactory: AsyncDatabaseFactory,
-  queryFactory: => QueryFactory)
+  queryFactory: QueryFactory)
 extends AsyncQueryEvaluatorFactory {
     def apply(
     hosts: List[String],
@@ -78,7 +78,9 @@ extends AsyncQueryEvaluator {
   }
 
   def shutdown() {
-    queryFactory.shutdown()
+    // TODO: Having to call shutdown on a factory object seems bizarre. We need to rewrite this
+    // (seems to be meant for tracing support) in a saner way.
+    // queryFactory.shutdown()
     database.shutdown()
   }
 
