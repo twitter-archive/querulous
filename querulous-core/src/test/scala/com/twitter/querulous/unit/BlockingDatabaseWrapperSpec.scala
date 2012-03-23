@@ -13,13 +13,13 @@ import com.twitter.conversions.time._
 class BlockingDatabaseWrapperSpec extends Specification {
   "BlockingDatabaseWrapper" should {
     val database = new DatabaseProxy {
-      var database: Database = _ // the "real" database
+      var database: Database = null // don't care
       val totalOpens         = new AtomicInteger(0)
       val openConns          = new AtomicInteger(0)
 
-      // the one other method BlockingDatabaseWrapper uses, hence the
-      // override
+      // override the methods BlockingDatabaseWrapper uses.
       override def openTimeout = 500.millis
+      override def hosts = List("localhost")
 
       def open() = {
         totalOpens.incrementAndGet
@@ -32,17 +32,24 @@ class BlockingDatabaseWrapperSpec extends Specification {
       def reset() { totalOpens.set(0); openConns.set(0) }
     }
 
-    val wrapper = new BlockingDatabaseWrapper(
-      AsyncQueryEvaluator.defaultWorkPool,
-      AsyncQueryEvaluator.checkoutPool(50),
-      database
-    )
+    val wrapper = new BlockingDatabaseWrapper(1, database)
 
     doBefore { database.reset() }
 
     "withConnection should follow connection lifecycle" in {
       wrapper withConnection { _ => "Done" } apply()
 
+      database.totalOpens.get mustEqual 1
+      database.openConns.get  mustEqual 0
+    }
+
+    "withConnection should not be interrupted if already executing" in {
+      val result = wrapper withConnection { _ =>
+        Thread.sleep(1000)
+        "Done"
+      } apply()
+
+      result mustBe "Done"
       database.totalOpens.get mustEqual 1
       database.openConns.get  mustEqual 0
     }
@@ -72,8 +79,7 @@ class BlockingDatabaseWrapperSpec extends Specification {
       println("Completed: "+ completed.size)
       println("Leaked:    "+ database.openConns.get)
 
-      // TODO: commented out, but should pass with the fix in util
-      //database.totalOpens.get mustEqual completed.size
+      database.totalOpens.get mustEqual completed.size
       database.openConns.get mustEqual 0
     }
   }
