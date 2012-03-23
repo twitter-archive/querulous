@@ -1,6 +1,8 @@
 package com.twitter.querulous.query
 
 import com.twitter.finagle.tracing.{Tracer, Annotation, Trace}
+import com.twitter.finagle.util.CloseNotifier
+import com.twitter.util.{Promise, Return}
 import java.sql.Connection
 import java.net.{UnknownHostException, InetSocketAddress, InetAddress}
 import java.nio.ByteBuffer
@@ -47,12 +49,16 @@ class TracingQuery(query: Query, connection: Connection, queryClass: QueryClass,
 
 class TracingQueryFactory(queryFactory: QueryFactory,
                           serviceName: String,
-                          tracer: Tracer) extends QueryFactory {
+                          tracerFactory: Tracer.Factory) extends QueryFactory {
+
+  private[this] val closing = new Promise[Unit]
+  private[this] val closeNotifier = CloseNotifier.makeLifo(closing)
+  private[this] val tracer = tracerFactory(closeNotifier)
 
   def apply(connection: Connection, queryClass: QueryClass, query: String, params: Any*) = {
     new TracingQuery(queryFactory(connection, queryClass, query, params: _*),
       connection, queryClass, serviceName, tracer)
   }
 
-  override def shutdown() = { tracer.release() }
+  override def shutdown() = { closing.updateIfEmpty(Return(())) }
 }
