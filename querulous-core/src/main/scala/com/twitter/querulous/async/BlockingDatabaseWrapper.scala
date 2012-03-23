@@ -70,6 +70,9 @@ extends AsyncDatabase {
 
     future.within(checkoutTimer, openTimeout) rescue { e =>
       e match {
+        // openTimeout elapsed. If our task has still not started, cancel it and return the
+        // exception. If not, rescue the exception with the original future, as if nothing
+        // happened.
         case e: TimeoutException => {
           val cancellable = startCoordinator.compareAndSet(true, false)
           if (cancellable) {
@@ -81,6 +84,7 @@ extends AsyncDatabase {
           }
         }
 
+        // Any other exception - just propagate unchanged.
         case _ => Future.exception(e)
       }
     }
