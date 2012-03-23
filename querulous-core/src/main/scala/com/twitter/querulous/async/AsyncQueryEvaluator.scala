@@ -10,22 +10,6 @@ import com.twitter.querulous.query.{QueryClass, SqlQueryFactory}
 import com.twitter.querulous.database.{ThrottledPoolingDatabaseFactory, Database}
 import com.twitter.conversions.time._
 
-object AsyncQueryEvaluator {
-  lazy val defaultWorkPool = FuturePool(Executors.newCachedThreadPool(new DaemonThreadFactory("asyncWorkPool")))
-  lazy val defaultMaxWaiters = Int.MaxValue
-
-  def checkoutPool(maxWaiters: Int) = {
-    FuturePool(
-      new ThreadPoolExecutor(
-        1, /* min size */
-        1, /* max size */
-        0, /* ignored, since the sizes are the same */
-        TimeUnit.MILLISECONDS, /* similarly ignored */
-        new LinkedBlockingQueue[Runnable](maxWaiters),
-        new DaemonThreadFactory("asyncCheckoutPool")))
-  }
-}
-
 trait AsyncQueryEvaluatorFactory {
   def apply(
     dbhosts: List[String],

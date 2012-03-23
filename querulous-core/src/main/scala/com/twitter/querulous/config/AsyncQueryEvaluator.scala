@@ -6,23 +6,14 @@ import com.twitter.querulous.async
 import com.twitter.querulous.database.DatabaseFactory
 import com.twitter.querulous.query.QueryFactory
 
-trait FuturePool {
-  def apply(): util.FuturePool
-}
-
-class AsyncQueryEvaluator {
-  var workPool: FuturePool = new FuturePool {
-    def apply() = async.AsyncQueryEvaluator.defaultWorkPool
-  }
-
-  var checkoutPool: FuturePool = new FuturePool {
-    def apply() = async.AsyncQueryEvaluator.checkoutPool(maxWaiters)
-  }
-
+abstract class AsyncQueryEvaluator {
   var database: Database     = new Database
   var query: Query           = new Query
-  var maxWaiters             = async.AsyncQueryEvaluator.defaultMaxWaiters
   var singletonFactory       = false
+
+  // Size of the work pool used by the AsyncDatabase to do all the DB query work.
+  // This should typically be the same size as the DB connection pool.
+  var workPoolSize: Int
 
   private var memoizedFactory: Option[async.AsyncQueryEvaluatorFactory] = None
 
@@ -48,15 +39,13 @@ class AsyncQueryEvaluator {
 
       memoizedFactory = memoizedFactory orElse {
         var dbFactory: async.AsyncDatabaseFactory = new async.BlockingDatabaseWrapperFactory(
-          workPool,
-          checkoutPool,
+          workPoolSize,
           newDatabaseFactory(stats, dbStatsFactory),
           stats
         )
 
         if (database.memoize) {
-          // Ensure AsyncDatabase gets memoized. This ensures there is exactly one checkout pool
-          // per actual db connection pool.
+          // Ensure AsyncDatabase gets memoized.
           dbFactory = new async.AsyncMemoizingDatabaseFactory(dbFactory)
         }
 
