@@ -43,34 +43,34 @@ class BlockingDatabaseWrapperSpec extends Specification {
       database.openConns.get  mustEqual 0
     }
 
-  //   "withConnection should follow lifecycle regardless of cancellation" in {
-  //     val hitBlock = new AtomicInteger(0)
-  //     val futures = for (i <- 1 to 100000) yield {
-  //       val f = wrapper.withConnection { _ =>
-  //         hitBlock.incrementAndGet
-  //         "Done"
-  //       } handle {
-  //         case e => "Cancelled"
-  //       }
-  //
-  //       f.cancel()
-  //       f
-  //     }
-  //
-  //     val results = Future.collect(futures).apply()
-  //     val completed = results partition { _ == "Done" } _1
-  //
-  //
-  //     // println debugging
-  //     println("Opened:    "+ database.totalOpens.get)
-  //     println("Ran block: "+ hitBlock.get)
-  //     println("Cancelled: "+ (100000 - completed.size))
-  //     println("Completed: "+ completed.size)
-  //     println("Leaked:    "+ database.openConns.get)
-  //
-  //     // TODO: commented out, but should pass with the fix in util
-  //     //database.totalOpens.get mustEqual completed.size
-  //     database.openConns.get mustEqual 0
-  //   }
+    "withConnection should follow lifecycle regardless of cancellation" in {
+      val hitBlock = new AtomicInteger(0)
+      val futures = for (i <- 1 to 100000) yield {
+        val f = wrapper.withConnection { _ =>
+          hitBlock.incrementAndGet
+          "Done"
+        } handle {
+          case e => "Cancelled"
+        }
+
+        f.cancel()
+        f
+      }
+
+      val results = Future.collect(futures).apply()
+      val completed = results partition { _ == "Done" } _1
+
+
+      // println debugging
+      println("Opened:    "+ database.totalOpens.get)
+      println("Ran block: "+ hitBlock.get)
+      println("Cancelled: "+ (100000 - completed.size))
+      println("Completed: "+ completed.size)
+      println("Leaked:    "+ database.openConns.get)
+
+      // TODO: commented out, but should pass with the fix in util
+      //database.totalOpens.get mustEqual completed.size
+      database.openConns.get mustEqual 0
+    }
   }
 }
