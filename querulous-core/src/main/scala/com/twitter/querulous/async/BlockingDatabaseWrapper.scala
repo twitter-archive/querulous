@@ -55,8 +55,8 @@ extends AsyncDatabase {
   def withConnection[R](f: Connection => R): Future[R] = {
     val startCoordinator = new AtomicBoolean(true)
     val future = workPool {
-      val runnable = startCoordinator.compareAndSet(true, false)
-      if (runnable) {
+      val isRunnable = startCoordinator.compareAndSet(true, false)
+      if (isRunnable) {
         val connection = database.open()
         try {
           f(connection)
@@ -68,24 +68,19 @@ extends AsyncDatabase {
       }
     }
 
-    future.within(checkoutTimer, openTimeout) rescue { e =>
-      e match {
-        // openTimeout elapsed. If our task has still not started, cancel it and return the
-        // exception. If not, rescue the exception with the original future, as if nothing
-        // happened.
-        case e: TimeoutException => {
-          val cancellable = startCoordinator.compareAndSet(true, false)
-          if (cancellable) {
-            stats.incr("db-async-open-timeout-count", 1)
-            future.cancel()
-            Future.exception(e)
-          } else {
-            future
-          }
+    // If openTimeout elapsed and our task has still not started, cancel it and return the
+    // exception. If not, rescue the exception with the *original* future, as if nothing
+    // happened. Any other exception - just propagate unchanged.
+    future.within(checkoutTimer, openTimeout) rescue {
+      case e: TimeoutException => {
+        val isCancellable = startCoordinator.compareAndSet(true, false)
+        if (isCancellable) {
+          stats.incr("db-async-open-timeout-count", 1)
+          future.cancel()
+          Future.exception(e)
+        } else {
+          future  // note: this is the original future not bounded by within().
         }
-
-        // Any other exception - just propagate unchanged.
-        case _ => Future.exception(e)
       }
     }
   }
