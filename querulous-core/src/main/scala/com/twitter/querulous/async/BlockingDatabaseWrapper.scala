@@ -1,7 +1,8 @@
 package com.twitter.querulous.async
 
 import java.util.logging.{Logger, Level}
-import java.util.concurrent.Executors
+import java.util.concurrent.{Executors, CancellationException}
+import java.util.concurrent.atomic.AtomicBoolean
 import java.sql.Connection
 import com.twitter.util.{Future, FuturePool, JavaTimer, TimeoutException}
 import com.twitter.querulous.{StatsCollector, NullStatsCollector, DaemonThreadFactory}
@@ -45,25 +46,36 @@ extends AsyncDatabase {
   private val openTimeout = database.openTimeout
 
   def withConnection[R](f: Connection => R): Future[R] = {
+    val startCoordinator = new AtomicBoolean(true)
     val future = workPool {
-      database.withConnection(f)
+      val runnable = startCoordinator.compareAndSet(true, false)
+      if (runnable) {
+        val connection = database.open()
+        try {
+          f(connection)
+        } finally {
+          database.close(connection)
+        }
+      } else {
+        throw new CancellationException
+      }
     }
 
-    // We need to ensure open timeout is enforced correctly. If a thread is available immediately in workPool,
-    // most likely a connection is available too, but if not, the underlying database is responsible for timing
-    // out the connection open() call. But if a thread is *not* immediately available, we don't want our
-    // request hanging there indefinitely, hence we use the mechanism below.
-    future.within(checkoutTimer, openTimeout) onFailure {
-      case e: TimeoutException => {
-        stats.incr("db-async-open-timeout-count", 1)
-        // Cancel the future. Note that the ExecutorServiceFuturePool only actually propagates the cancel
-        // if the task hasn't run yet, which is exactly the behavior we want. Our goal is to abort requests
-        // waiting too long for an available connection, not those that already got one and are already
-        // executing (there is a separate query timeout mechanism for that).
-        future.cancel()
-      }
+    future.within(checkoutTimer, openTimeout) rescue { e =>
+      e match {
+        case e: TimeoutException => {
+          val cancellable = startCoordinator.compareAndSet(true, false)
+          if (cancellable) {
+            stats.incr("db-async-open-timeout-count", 1)
+            future.cancel()
+            Future.exception(e)
+          } else {
+            future
+          }
+        }
 
-      case _ => {}
+        case _ => Future.exception(e)
+      }
     }
   }
 
