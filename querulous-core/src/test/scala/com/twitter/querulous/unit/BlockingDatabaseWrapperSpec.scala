@@ -43,6 +43,17 @@ class BlockingDatabaseWrapperSpec extends Specification {
       database.openConns.get  mustEqual 0
     }
 
+    "withConnection should not be interrupted if already executing" in {
+      val result = wrapper withConnection { _ =>
+        Thread.sleep(1000)
+        "Done"
+      } apply()
+
+      result mustBe "Done"
+      database.totalOpens.get mustEqual 1
+      database.openConns.get  mustEqual 0
+    }
+
     "withConnection should follow lifecycle regardless of cancellation" in {
       val hitBlock = new AtomicInteger(0)
       val futures = for (i <- 1 to 100000) yield {
@@ -68,8 +79,7 @@ class BlockingDatabaseWrapperSpec extends Specification {
       println("Completed: "+ completed.size)
       println("Leaked:    "+ database.openConns.get)
 
-      // TODO: commented out, but should pass with the fix in util
-      //database.totalOpens.get mustEqual completed.size
+      database.totalOpens.get mustEqual completed.size
       database.openConns.get mustEqual 0
     }
   }
