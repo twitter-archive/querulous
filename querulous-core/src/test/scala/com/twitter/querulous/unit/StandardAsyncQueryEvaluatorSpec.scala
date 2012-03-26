@@ -35,7 +35,6 @@ class StandardAsyncQueryEvaluatorSpec extends Specification with JMocker with Cl
         one(database).open()                                               willReturn connection
         one(queryFactory).apply(connection, QueryClass.Select, "SELECT 1") willReturn query
         one(query).select(fromRow)                                         willReturn Seq(1)
-        one(database).close(connection)
       }
 
       newEvaluator().select("SELECT 1")(fromRow).get()
@@ -48,7 +47,6 @@ class StandardAsyncQueryEvaluatorSpec extends Specification with JMocker with Cl
         one(database).open()                                               willReturn connection
         one(queryFactory).apply(connection, QueryClass.Select, "SELECT 1") willReturn query
         one(query).select(fromRow)                                         willReturn Seq(1)
-        one(database).close(connection)
       }
 
       newEvaluator().selectOne("SELECT 1")(fromRow).get()
@@ -61,7 +59,6 @@ class StandardAsyncQueryEvaluatorSpec extends Specification with JMocker with Cl
         one(database).open()                                               willReturn connection
         one(queryFactory).apply(connection, QueryClass.Select, "SELECT 1") willReturn query
         one(query).select(any[ResultSet => Int])                           willReturn Seq(1)
-        one(database).close(connection)
       }
 
       newEvaluator().count("SELECT 1").get()
@@ -76,7 +73,6 @@ class StandardAsyncQueryEvaluatorSpec extends Specification with JMocker with Cl
         one(database).open()                                         willReturn connection
         one(queryFactory).apply(connection, QueryClass.Execute, sql) willReturn query
         one(query).execute()                                         willReturn 1
-        one(database).close(connection)
       }
 
       newEvaluator().execute("INSERT INTO foo (id) VALUES (1)").get()
@@ -92,7 +88,6 @@ class StandardAsyncQueryEvaluatorSpec extends Specification with JMocker with Cl
         one(queryFactory).apply(connection, QueryClass.Execute, sql) willReturn query
         one(query).addParams(1)
         one(query).execute()                                         willReturn 1
-        one(database).close(connection)
       }
 
       newEvaluator().executeBatch("INSERT INTO foo (id) VALUES (?)")(_(1)).get()
@@ -110,7 +105,6 @@ class StandardAsyncQueryEvaluatorSpec extends Specification with JMocker with Cl
         one(query).execute()                                         willReturn 1
         one(connection).commit()
         one(connection).setAutoCommit(true)
-        one(database).close(connection)
       }
 
       newEvaluator().transaction(_.execute("INSERT INTO foo (id) VALUES (1)")).get()

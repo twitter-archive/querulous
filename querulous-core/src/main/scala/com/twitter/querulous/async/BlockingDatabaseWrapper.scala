@@ -74,6 +74,7 @@ extends AsyncDatabase {
             // terminated with an unhandled exception. If neither is the case (e.g. this was a benign
             // exception like a SQL constraint violation), it still doesn't hurt much to return/re-borrow
             // the connection from the underlying database, given that this should be rare.
+            // TODO: Handle possible connection leakage if this thread is destroyed in some other way.
             database.close(connection)
             tlConnection.remove()
             throw e
