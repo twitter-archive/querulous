@@ -1,7 +1,7 @@
 package com.twitter.querulous.async
 
 import java.util.logging.{Logger, Level}
-import java.util.concurrent.{Executors, CancellationException}
+import java.util.concurrent.{Executors, CancellationException, ThreadPoolExecutor, LinkedBlockingQueue, TimeUnit}
 import java.util.concurrent.atomic.AtomicBoolean
 import java.sql.Connection
 import com.twitter.util.{Future, FuturePool, JavaTimer, TimeoutException}
@@ -41,15 +41,28 @@ class BlockingDatabaseWrapper(
 extends AsyncDatabase {
   import AsyncConnectionCheckout._
 
-  private val workPool = FuturePool(Executors.newFixedThreadPool(
-      workPoolSize, new DaemonThreadFactory("asyncWorkPool-" + database.hosts.mkString(","))))
+  // Note: Our executor is similar to what you'd get via Executors.newFixedThreadPool(), but the latter
+  // returns an ExecutorService, which unfortunately doesn't give us as much visibility into stats as
+  // the ThreadPoolExecutor, so we create one ourselves.
+  private val executor = {
+    val e = new ThreadPoolExecutor(workPoolSize, workPoolSize, 0L, TimeUnit.MILLISECONDS,
+                                   new LinkedBlockingQueue[Runnable](),
+                                   new DaemonThreadFactory("asyncWorkPool-" + database.hosts.mkString(",")));
+    stats.addGauge("db-async-active-threads")(e.getActiveCount)
+    stats.addGauge("db-async-waiters")(e.getQueue.size)
+    e
+  }
+  private val workPool = FuturePool(executor)
   private val openTimeout = database.openTimeout
 
   // We cache the connection checked out from the underlying database in a thread local so
   // that each workPool thread can hold on to a connection for its lifetime. This saves expensive
   // context switches in borrowing/returning connections from the underlying database per request.
   private val tlConnection = new ThreadLocal[Connection] {
-    override def initialValue() = database.open()
+    override def initialValue() = {
+      stats.incr("db-async-cached-connection-acquire", 1)
+      database.open()
+    }
   }
 
   // Basically all we need to do is offload the real work to workPool. However, there is one
@@ -75,6 +88,7 @@ extends AsyncDatabase {
             // exception like a SQL constraint violation), it still doesn't hurt much to return/re-borrow
             // the connection from the underlying database, given that this should be rare.
             // TODO: Handle possible connection leakage if this thread is destroyed in some other way.
+            stats.incr("db-async-cached-connection-release", 1)
             database.close(connection)
             tlConnection.remove()
             throw e
