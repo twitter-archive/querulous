@@ -45,6 +45,13 @@ extends AsyncDatabase {
       workPoolSize, new DaemonThreadFactory("asyncWorkPool-" + database.hosts.mkString(","))))
   private val openTimeout = database.openTimeout
 
+  // We cache the connection checked out from the underlying database in a thread local so
+  // that each workPool thread can hold on to a connection for its lifetime. This saves expensive
+  // context switches in borrowing/returning connections from the underlying database per request.
+  private val tlConnection = new ThreadLocal[Connection] {
+    override def initialValue() = database.open()
+  }
+
   // Basically all we need to do is offload the real work to workPool. However, there is one
   // complication - enforcement of DB open timeout. If a connection is not available, most
   // likely neither is a thread to do the work, so requests would queue up in the future pool.
@@ -57,11 +64,20 @@ extends AsyncDatabase {
     val future = workPool {
       val isRunnable = startCoordinator.compareAndSet(true, false)
       if (isRunnable) {
-        val connection = database.open()
+        val connection = tlConnection.get()
         try {
           f(connection)
-        } finally {
-          database.close(connection)
+        } catch {
+          case e => {
+            // An exception occurred. To be safe, we return our cached connection back to the pool. This
+            // protects us in case either the connection has been killed or our thread is going to be
+            // terminated with an unhandled exception. If neither is the case (e.g. this was a benign
+            // exception like a SQL constraint violation), it still doesn't hurt much to return/re-borrow
+            // the connection from the underlying database, given that this should be rare.
+            database.close(connection)
+            tlConnection.remove()
+            throw e
+          }
         }
       } else {
         throw new CancellationException
