@@ -32,12 +32,20 @@ class BlockingDatabaseWrapperSpec extends Specification {
       def reset() { totalOpens.set(0); openConns.set(0) }
     }
 
-    val wrapper = new BlockingDatabaseWrapper(1, database)
+    val numThreads = 2
+    val wrapper = new BlockingDatabaseWrapper(numThreads, database)
 
     doBefore { database.reset() }
 
     "withConnection should follow connection lifecycle" in {
       wrapper withConnection { _ => "Done" } apply()
+
+      database.totalOpens.get mustEqual 1
+      database.openConns.get  mustEqual 1
+    }
+
+    "withConnection should return connection on exception" in {
+      wrapper withConnection { _ => throw new Exception } handle { case _ => "Done with Exception" } apply()
 
       database.totalOpens.get mustEqual 1
       database.openConns.get  mustEqual 0
@@ -51,7 +59,7 @@ class BlockingDatabaseWrapperSpec extends Specification {
 
       result mustBe "Done"
       database.totalOpens.get mustEqual 1
-      database.openConns.get  mustEqual 0
+      database.openConns.get  mustEqual 1
     }
 
     "withConnection should follow lifecycle regardless of cancellation" in {
@@ -77,10 +85,10 @@ class BlockingDatabaseWrapperSpec extends Specification {
       println("Ran block: "+ hitBlock.get)
       println("Cancelled: "+ (100000 - completed.size))
       println("Completed: "+ completed.size)
-      println("Leaked:    "+ database.openConns.get)
+      println("Cached:    "+ database.openConns.get)
 
-      database.totalOpens.get mustEqual completed.size
-      database.openConns.get mustEqual 0
+      database.totalOpens.get mustEqual numThreads
+      database.openConns.get mustEqual numThreads
     }
   }
 }
