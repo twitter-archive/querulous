@@ -88,6 +88,8 @@ extends AsyncDatabase {
             // exception like a SQL constraint violation), it still doesn't hurt much to return/re-borrow
             // the connection from the underlying database, given that this should be rare.
             // TODO: Handle possible connection leakage if this thread is destroyed in some other way.
+            // (Note that leaking an exception from here will not kill the thread since the FuturePool
+            // will swallow it and wrap with a Throw()).
             stats.incr("db-async-cached-connection-release", 1)
             database.close(connection)
             tlConnection.remove()
