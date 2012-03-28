@@ -4,20 +4,40 @@ import com.twitter.querulous.database.SingleConnectionDatabaseFactory
 import com.twitter.querulous.query.SqlQueryFactory
 import com.twitter.querulous.evaluator.{QueryEvaluator, StandardQueryEvaluatorFactory}
 import com.twitter.util.Eval
-import java.io.File
+import java.io.{File, FileNotFoundException}
 import java.util.concurrent.CountDownLatch
 import org.specs.Specification
 
 import config.Connection
 
 trait ConfiguredSpecification extends Specification {
-  val config = try {
+  lazy val config = try {
     val eval = new Eval
-    eval[Connection](new File("config/test.scala"))
+    // if this repo is embedded in other repo (eg. birdcage), test.scala will be
+    // one level deeper than if running in a detached repo mode.
+    val configFile =
+      Some(new File("querulous/config/test.scala")) filter { _.exists } orElse {
+        Some(new File("config/test.scala")) filter { _.exists }
+      } getOrElse {
+        throw new FileNotFoundException("config/test.scala")
+      }
+    eval[Connection](configFile)
   } catch {
     case e =>
       e.printStackTrace()
       throw e
+  }
+
+  /**
+   * Wrap a test in this method to prevent it from running when on the CI machine.
+   * Some tests require a local mysqld, and will fail if executed on the CI machine.
+   */
+  def skipIfCI(f: => Unit) {
+    if (System.getenv().containsKey("SBT_CI")) {
+      skip("skipping on CI machine")
+    } else {
+      f
+    }
   }
 }
 

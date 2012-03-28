@@ -18,31 +18,33 @@ class TimeoutSpec extends ConfiguredSpecification {
   val timingOutQueryEvaluatorFactory = new StandardQueryEvaluatorFactory(testDatabaseFactory, timingOutQueryFactory)
 
   "Timeouts" should {
-    doBefore {
-      testEvaluatorFactory(config.withoutDatabase).execute("CREATE DATABASE IF NOT EXISTS db_test")
-    }
-
-    "honor timeouts" in {
-      val queryEvaluator1 = testEvaluatorFactory(config)
-      val dbLock = getDbLock(queryEvaluator1, "padlock")
-
-      val thread = new Thread() {
-        override def run() {
-          try {
-            Thread.sleep(60.seconds.inMillis)
-          } catch { case _ => () }
-          dbLock.countDown()
-        }
+    skipIfCI {
+      doBefore {
+        testEvaluatorFactory(config.withoutDatabase).execute("CREATE DATABASE IF NOT EXISTS db_test")
       }
-      thread.start()
 
-      val queryEvaluator2 = timingOutQueryEvaluatorFactory(config)
-      val start = Time.now
-      queryEvaluator2.select("SELECT GET_LOCK('padlock', 60) AS rv") { row => row.getInt("rv") } must throwA[SqlQueryTimeoutException]
-      val end = Time.now
-      (end - start).inMillis must beCloseTo(timeout.inMillis, 1.second.inMillis)
-      thread.interrupt()
-      thread.join()
+      "honor timeouts" in {
+        val queryEvaluator1 = testEvaluatorFactory(config)
+        val dbLock = getDbLock(queryEvaluator1, "padlock")
+
+        val thread = new Thread() {
+          override def run() {
+            try {
+              Thread.sleep(60.seconds.inMillis)
+            } catch { case _ => () }
+            dbLock.countDown()
+          }
+        }
+        thread.start()
+
+        val queryEvaluator2 = timingOutQueryEvaluatorFactory(config)
+        val start = Time.now
+        queryEvaluator2.select("SELECT GET_LOCK('padlock', 60) AS rv") { row => row.getInt("rv") } must throwA[SqlQueryTimeoutException]
+        val end = Time.now
+        (end - start).inMillis must beCloseTo(timeout.inMillis, 1.second.inMillis)
+        thread.interrupt()
+        thread.join()
+      }
     }
   }
 }

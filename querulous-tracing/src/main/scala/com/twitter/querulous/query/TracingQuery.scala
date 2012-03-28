@@ -64,7 +64,7 @@ class TracingQuery(query: Query,
       rv
     }
   }
-  
+
   def getLocalAddress(connection: Connection): Option[InetSocketAddress] = {
     try {
       // don't know the port
@@ -73,7 +73,7 @@ class TracingQuery(query: Query,
     } catch {
       case e: UnknownHostException => None
     }
-  }  
+  }
 }
 
 class TracingQueryFactory(queryFactory: QueryFactory,
