@@ -1,7 +1,7 @@
 import sbt._
+import scala.collection.jcl
 
 class Plugins(info: ProjectInfo) extends PluginDefinition(info) {
-  import scala.collection.jcl
   val environment = jcl.Map(System.getenv())
   def isSBTOpenTwitter = environment.get("SBT_OPEN_TWITTER").isDefined
   def isSBTTwitter = environment.get("SBT_TWITTER").isDefined

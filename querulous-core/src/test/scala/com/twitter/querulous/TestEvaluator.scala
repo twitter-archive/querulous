@@ -13,6 +13,8 @@ import config.Connection
 trait ConfiguredSpecification extends Specification {
   lazy val config = try {
     val eval = new Eval
+    // if this repo is embedded in other repo (eg. birdcage), test.scala will be
+    // one level deeper than if running in a detached repo mode.
     val configFile =
       Some(new File("querulous/config/test.scala")) filter { _.exists } orElse {
         Some(new File("config/test.scala")) filter { _.exists }
@@ -26,6 +28,10 @@ trait ConfiguredSpecification extends Specification {
       throw e
   }
 
+  /**
+   * Wrap a test in this method to prevent it from running when on the CI machine.
+   * Some tests require a local mysqld, and will fail if executed on the CI machine.
+   */
   def skipIfCI(f: => Unit) {
     if (System.getenv().containsKey("SBT_CI")) {
       skip("skipping on CI machine")
