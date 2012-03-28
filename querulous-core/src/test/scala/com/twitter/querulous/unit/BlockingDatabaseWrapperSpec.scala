@@ -20,6 +20,7 @@ class BlockingDatabaseWrapperSpec extends Specification {
       // override the methods BlockingDatabaseWrapper uses.
       override def openTimeout = 500.millis
       override def hosts = List("localhost")
+      override def name = "test"
 
       def open() = {
         totalOpens.incrementAndGet
@@ -33,8 +34,8 @@ class BlockingDatabaseWrapperSpec extends Specification {
     }
 
     val numThreads = 2
-    val wrapper = new BlockingDatabaseWrapper(numThreads, database)
-
+    val wrapper = new BlockingDatabaseWrapper(numThreads, Int.MaxValue, database)
+    // TODO: Test max waiters.
     doBefore { database.reset() }
 
     "withConnection should follow connection lifecycle" in {

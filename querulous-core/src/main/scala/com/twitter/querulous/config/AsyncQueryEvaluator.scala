@@ -10,6 +10,7 @@ abstract class AsyncQueryEvaluator {
   var database: Database     = new Database
   var query: Query           = new Query
   var singletonFactory       = false
+  var maxWaiters             = Int.MaxValue
 
   // Size of the work pool used by the AsyncDatabase to do all the DB query work.
   // This should typically be the same size as the DB connection pool.
@@ -40,6 +41,7 @@ abstract class AsyncQueryEvaluator {
       memoizedFactory = memoizedFactory orElse {
         var dbFactory: async.AsyncDatabaseFactory = new async.BlockingDatabaseWrapperFactory(
           workPoolSize,
+          maxWaiters,
           newDatabaseFactory(stats, dbStatsFactory),
           stats
         )
