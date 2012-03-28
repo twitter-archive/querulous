@@ -42,15 +42,19 @@ class DatabaseSpec extends ConfiguredSpecification with JMocker with ClassMocker
   }
 
   "SingleConnectionDatabaseFactory" should {
-    val factory = new SingleConnectionDatabaseFactory(defaultProps)
-    testFactory(factory)
+    skipIfCI {
+      val factory = new SingleConnectionDatabaseFactory(defaultProps)
+      testFactory(factory)
+    }
   }
 
   "ApachePoolingDatabaseFactory" should {
-    val factory = new ApachePoolingDatabaseFactory(
-      10, 10, 1.second, 10.millis, false, 0.seconds, defaultProps
-    )
+    skipIfCI {
+      val factory = new ApachePoolingDatabaseFactory(
+        10, 10, 1.second, 10.millis, false, 0.seconds, defaultProps
+      )
 
-    testFactory(factory)
+      testFactory(factory)
+    }
   }
 }

@@ -13,91 +13,92 @@ class QueryEvaluatorSpec extends ConfiguredSpecification with JMocker with Class
   import TestEvaluator._
 
   "QueryEvaluator" should {
-    val queryEvaluator = testEvaluatorFactory(config)
-    val rootQueryEvaluator = testEvaluatorFactory(config.withoutDatabase)
-    val queryFactory = new SqlQueryFactory
+    skipIfCI {
+      val queryEvaluator = testEvaluatorFactory(config)
+      val rootQueryEvaluator = testEvaluatorFactory(config.withoutDatabase)
+      val queryFactory = new SqlQueryFactory
 
-    doBefore {
-      rootQueryEvaluator.execute("CREATE DATABASE IF NOT EXISTS db_test")
-    }
-
-    doAfter {
-      queryEvaluator.execute("DROP TABLE IF EXISTS foo")
-    }
-
-    "connection pooling" in {
-      val connection = mock[Connection]
-      val database = new FakeDBConnectionWrapper(connection)
-
-      "transactionally" >> {
-        val queryEvaluator = new StandardQueryEvaluator(database, queryFactory)
-
-        expect {
-          one(connection).setAutoCommit(false)
-          one(connection).prepareStatement("SELECT 1")
-          one(connection).commit()
-          one(connection).setAutoCommit(true)
-        }
-
-        queryEvaluator.transaction { transaction =>
-          transaction.selectOne("SELECT 1") { _.getInt("1") }
-        }
+      doBefore {
+        rootQueryEvaluator.execute("CREATE DATABASE IF NOT EXISTS db_test")
       }
 
-      "nontransactionally" >> {
-        val queryEvaluator = new StandardQueryEvaluator(database, queryFactory)
-
-        expect {
-          one(connection).prepareStatement("SELECT 1")
-        }
-
-        var list = new mutable.ListBuffer[Int]
-        queryEvaluator.selectOne("SELECT 1") { _.getInt("1") }
+      doAfter {
+        queryEvaluator.execute("DROP TABLE IF EXISTS foo")
       }
-    }
 
-    "select rows" in {
-      var list = new mutable.ListBuffer[Int]
-      queryEvaluator.select("SELECT 1 as one") { resultSet =>
-        list += resultSet.getInt("one")
-      }
-      list.toList mustEqual List(1)
-    }
+      "connection pooling" in {
+        val connection = mock[Connection]
+        val database = new FakeDBConnectionWrapper(connection)
 
-    "fallback to a read slave" in {
-      // should always succeed if you have the right mysql driver.
-      val queryEvaluator = testEvaluatorFactory(
-        "localhost:12349" :: config.hostnames.toList, config.database, config.username, config.password)
-      queryEvaluator.selectOne("SELECT 1") { row => row.getInt(1) }.toList mustEqual List(1)
-      queryEvaluator.execute("CREATE TABLE foo (id INT)") must throwA[SQLException]
-    }
+        "transactionally" >> {
+          val queryEvaluator = new StandardQueryEvaluator(database, queryFactory)
 
-    "transaction" in {
-      "when there is an exception" >> {
-        queryEvaluator.execute("CREATE TABLE foo (bar INT) ENGINE=INNODB")
-
-        try {
-          queryEvaluator.transaction { transaction =>
-            transaction.execute("INSERT INTO foo VALUES (1)")
-            throw new Exception("oh noes")
+          expect {
+            one(connection).setAutoCommit(false)
+            one(connection).prepareStatement("SELECT 1")
+            one(connection).commit()
+            one(connection).setAutoCommit(true)
           }
-        } catch {
-          case _ =>
+
+          queryEvaluator.transaction { transaction =>
+            transaction.selectOne("SELECT 1") { _.getInt("1") }
+          }
         }
 
-        queryEvaluator.select("SELECT * FROM foo")(_.getInt("bar")).toList mustEqual Nil
+        "nontransactionally" >> {
+          val queryEvaluator = new StandardQueryEvaluator(database, queryFactory)
+
+          expect {
+            one(connection).prepareStatement("SELECT 1")
+          }
+
+          var list = new mutable.ListBuffer[Int]
+          queryEvaluator.selectOne("SELECT 1") { _.getInt("1") }
+        }
       }
 
-      "when there is not an exception" >> {
-        queryEvaluator.execute("CREATE TABLE foo (bar VARCHAR(50), baz INT) ENGINE=INNODB")
+      "select rows" in {
+        var list = new mutable.ListBuffer[Int]
+        queryEvaluator.select("SELECT 1 as one") { resultSet =>
+          list += resultSet.getInt("one")
+        }
+        list.toList mustEqual List(1)
+      }
 
-        queryEvaluator.transaction { transaction =>
-          transaction.execute("INSERT INTO foo VALUES (?, ?)", "one", 2)
+      "fallback to a read slave" in {
+        // should always succeed if you have the right mysql driver.
+        val queryEvaluator = testEvaluatorFactory(
+          "localhost:12349" :: config.hostnames.toList, config.database, config.username, config.password)
+        queryEvaluator.selectOne("SELECT 1") { row => row.getInt(1) }.toList mustEqual List(1)
+        queryEvaluator.execute("CREATE TABLE foo (id INT)") must throwA[SQLException]
+      }
+
+      "transaction" in {
+        "when there is an exception" >> {
+          queryEvaluator.execute("CREATE TABLE foo (bar INT) ENGINE=INNODB")
+
+          try {
+            queryEvaluator.transaction { transaction =>
+              transaction.execute("INSERT INTO foo VALUES (1)")
+              throw new Exception("oh noes")
+            }
+          } catch {
+            case _ =>
+          }
+
+          queryEvaluator.select("SELECT * FROM foo")(_.getInt("bar")).toList mustEqual Nil
         }
 
-        queryEvaluator.select("SELECT * FROM foo") { row => (row.getString("bar"), row.getInt("baz")) }.toList mustEqual List(("one", 2))
+        "when there is not an exception" >> {
+          queryEvaluator.execute("CREATE TABLE foo (bar VARCHAR(50), baz INT) ENGINE=INNODB")
+
+          queryEvaluator.transaction { transaction =>
+            transaction.execute("INSERT INTO foo VALUES (?, ?)", "one", 2)
+          }
+
+          queryEvaluator.select("SELECT * FROM foo") { row => (row.getString("bar"), row.getInt("baz")) }.toList mustEqual List(("one", 2))
+        }
       }
     }
-
   }
 }
