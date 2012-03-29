@@ -108,13 +108,13 @@ class BlockingDatabaseWrapperSpec extends Specification {
       }
 
       val results = Future.collect(futures).apply()
-      val completed = results partition { _ == "Done" } _1
-      val rejected = results partition { _ == "Rejected" } _1
-      val timedout = results partition { _ == "Timeout" } _1
+      val completed = results count { _ == "Done" }
+      val rejected = results count { _ == "Rejected" }
+      val timedout = results count { _ == "Timeout" }
 
-      completed.size mustEqual numThreads
-      timedout.size mustEqual maxWaiters
-      rejected.size mustEqual (results.size - completed.size - timedout.size)
+      completed mustEqual numThreads
+      timedout mustEqual maxWaiters
+      rejected mustEqual (results.size - completed - timedout)
 
       database.totalOpens.get mustEqual numThreads
       database.openConns.get mustEqual numThreads
