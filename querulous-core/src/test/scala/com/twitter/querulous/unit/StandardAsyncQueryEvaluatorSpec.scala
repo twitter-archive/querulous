@@ -19,7 +19,7 @@ class StandardAsyncQueryEvaluatorSpec extends Specification with JMocker with Cl
 
   def newEvaluator() = {
     new StandardAsyncQueryEvaluator(
-      new BlockingDatabaseWrapper(1, database),
+      new BlockingDatabaseWrapper(1, Int.MaxValue, database),
       queryFactory
     )
   }
@@ -31,6 +31,7 @@ class StandardAsyncQueryEvaluatorSpec extends Specification with JMocker with Cl
     "select" in {
       expect {
         one(database).hosts()                                              willReturn List("localhost")
+        one(database).name                                                 willReturn "test"
         one(database).openTimeout                                          willReturn 500.millis
         one(database).open()                                               willReturn connection
         one(queryFactory).apply(connection, QueryClass.Select, "SELECT 1") willReturn query
@@ -43,6 +44,7 @@ class StandardAsyncQueryEvaluatorSpec extends Specification with JMocker with Cl
     "selectOne" in {
       expect {
         one(database).hosts()                                              willReturn List("localhost")
+        one(database).name                                                 willReturn "test"
         one(database).openTimeout                                          willReturn 500.millis
         one(database).open()                                               willReturn connection
         one(queryFactory).apply(connection, QueryClass.Select, "SELECT 1") willReturn query
@@ -55,6 +57,7 @@ class StandardAsyncQueryEvaluatorSpec extends Specification with JMocker with Cl
     "count" in {
       expect {
         one(database).hosts()                                              willReturn List("localhost")
+        one(database).name                                                 willReturn "test"
         one(database).openTimeout                                          willReturn 500.millis
         one(database).open()                                               willReturn connection
         one(queryFactory).apply(connection, QueryClass.Select, "SELECT 1") willReturn query
@@ -69,6 +72,7 @@ class StandardAsyncQueryEvaluatorSpec extends Specification with JMocker with Cl
 
       expect {
         one(database).hosts()                                        willReturn List("localhost")
+        one(database).name                                           willReturn "test"
         one(database).openTimeout                                    willReturn 500.millis
         one(database).open()                                         willReturn connection
         one(queryFactory).apply(connection, QueryClass.Execute, sql) willReturn query
@@ -83,6 +87,7 @@ class StandardAsyncQueryEvaluatorSpec extends Specification with JMocker with Cl
 
       expect {
         one(database).hosts()                                        willReturn List("localhost")
+        one(database).name                                           willReturn "test"
         one(database).openTimeout                                    willReturn 500.millis
         one(database).open()                                         willReturn connection
         one(queryFactory).apply(connection, QueryClass.Execute, sql) willReturn query
@@ -98,6 +103,7 @@ class StandardAsyncQueryEvaluatorSpec extends Specification with JMocker with Cl
 
       expect {
         one(database).hosts()                                        willReturn List("localhost")
+        one(database).name                                           willReturn "test"
         one(database).openTimeout                                    willReturn 500.millis
         one(database).open()                                         willReturn connection
         one(connection).setAutoCommit(false)

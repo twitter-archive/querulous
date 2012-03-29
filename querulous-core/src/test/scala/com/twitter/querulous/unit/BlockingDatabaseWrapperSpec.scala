@@ -3,7 +3,8 @@ package com.twitter.querulous.unit
 import org.specs.Specification
 import java.sql.Connection
 import java.util.concurrent.atomic._
-import com.twitter.util.Future
+import java.util.concurrent.RejectedExecutionException
+import com.twitter.util.{Future, TimeoutException}
 import com.twitter.querulous.database._
 import com.twitter.querulous.query._
 import com.twitter.querulous.async._
@@ -20,6 +21,7 @@ class BlockingDatabaseWrapperSpec extends Specification {
       // override the methods BlockingDatabaseWrapper uses.
       override def openTimeout = 500.millis
       override def hosts = List("localhost")
+      override def name = "test"
 
       def open() = {
         totalOpens.incrementAndGet
@@ -33,7 +35,8 @@ class BlockingDatabaseWrapperSpec extends Specification {
     }
 
     val numThreads = 2
-    val wrapper = new BlockingDatabaseWrapper(numThreads, database)
+    val maxWaiters = 1000
+    val wrapper = new BlockingDatabaseWrapper(numThreads, maxWaiters, database)
 
     doBefore { database.reset() }
 
@@ -86,6 +89,32 @@ class BlockingDatabaseWrapperSpec extends Specification {
       println("Cancelled: "+ (100000 - completed.size))
       println("Completed: "+ completed.size)
       println("Cached:    "+ database.openConns.get)
+
+
+      database.totalOpens.get mustEqual numThreads
+      database.openConns.get mustEqual numThreads
+    }
+
+    "withConnection should respect open timeout and max waiters" in {
+      val futures = for (i <- 1 to 10000) yield {
+        wrapper.withConnection { _ =>
+          Thread.sleep(database.openTimeout * 2)
+          "Done"
+        } handle {
+          case e: RejectedExecutionException => "Rejected"
+          case e: TimeoutException           => "Timeout"
+          case _                             => "Failed"
+        }
+      }
+
+      val results = Future.collect(futures).apply()
+      val completed = results count { _ == "Done" }
+      val rejected = results count { _ == "Rejected" }
+      val timedout = results count { _ == "Timeout" }
+
+      completed mustEqual numThreads
+      timedout mustEqual maxWaiters
+      rejected mustEqual (results.size - completed - timedout)
 
       database.totalOpens.get mustEqual numThreads
       database.openConns.get mustEqual numThreads

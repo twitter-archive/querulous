@@ -1,7 +1,8 @@
 package com.twitter.querulous.async
 
 import java.util.logging.{Logger, Level}
-import java.util.concurrent.{Executors, CancellationException, ThreadPoolExecutor, LinkedBlockingQueue, TimeUnit}
+import java.util.concurrent.{Executors, CancellationException, ThreadPoolExecutor}
+import java.util.concurrent.{LinkedBlockingQueue, TimeUnit, RejectedExecutionException}
 import java.util.concurrent.atomic.AtomicBoolean
 import java.sql.Connection
 import com.twitter.util.{Future, FuturePool, JavaTimer, TimeoutException}
@@ -11,6 +12,7 @@ import com.twitter.querulous.config
 
 class BlockingDatabaseWrapperFactory(
   workPoolSize: Int,
+  maxWaiters: Int,
   factory: DatabaseFactory,
   stats: StatsCollector = NullStatsCollector)
 extends AsyncDatabaseFactory {
@@ -24,6 +26,7 @@ extends AsyncDatabaseFactory {
   ): AsyncDatabase = {
     new BlockingDatabaseWrapper(
       workPoolSize,
+      maxWaiters,
       factory(hosts, name, username, password, urlOptions, driverName),
       stats
     )
@@ -36,22 +39,21 @@ private object AsyncConnectionCheckout {
 
 class BlockingDatabaseWrapper(
   workPoolSize: Int,
+  maxWaiters: Int,
   protected[async] val database: Database,
   stats: StatsCollector = NullStatsCollector)
 extends AsyncDatabase {
   import AsyncConnectionCheckout._
 
+  val dbStr = database.hosts.mkString(",") + "-" + database.name
+
   // Note: Our executor is similar to what you'd get via Executors.newFixedThreadPool(), but the latter
   // returns an ExecutorService, which unfortunately doesn't give us as much visibility into stats as
-  // the ThreadPoolExecutor, so we create one ourselves.
-  private val executor = {
-    val e = new ThreadPoolExecutor(workPoolSize, workPoolSize, 0L, TimeUnit.MILLISECONDS,
-                                   new LinkedBlockingQueue[Runnable](),
-                                   new DaemonThreadFactory("asyncWorkPool-" + database.hosts.mkString(",")));
-    stats.addGauge("db-async-active-threads")(e.getActiveCount)
-    stats.addGauge("db-async-waiters")(e.getQueue.size)
-    e
-  }
+  // the ThreadPoolExecutor, so we create one ourselves. We use a LinkedBlockingQueue for memory efficiency
+  // since maxWaiters can be very high (configuration default is Int.MaxValue, i.e. unbounded).
+  private val executor = new ThreadPoolExecutor(workPoolSize, workPoolSize, 0L, TimeUnit.MILLISECONDS,
+                                                new LinkedBlockingQueue[Runnable](maxWaiters),
+                                                new DaemonThreadFactory("asyncWorkPool-" + dbStr));
   private val workPool = FuturePool(executor)
   private val openTimeout = database.openTimeout
 
@@ -60,7 +62,8 @@ extends AsyncDatabase {
   // context switches in borrowing/returning connections from the underlying database per request.
   private val tlConnection = new ThreadLocal[Connection] {
     override def initialValue() = {
-      stats.incr("db-async-cached-connection-acquire", 1)
+      stats.incr("db-async-cached-connection-acquire-total", 1)
+      stats.incr("db-async-cached-connection-acquire-" + dbStr, 1)
       database.open()
     }
   }
@@ -90,7 +93,8 @@ extends AsyncDatabase {
             // TODO: Handle possible connection leakage if this thread is destroyed in some other way.
             // (Note that leaking an exception from here will not kill the thread since the FuturePool
             // will swallow it and wrap with a Throw()).
-            stats.incr("db-async-cached-connection-release", 1)
+            stats.incr("db-async-cached-connection-release-total", 1)
+            stats.incr("db-async-cached-connection-release-" + dbStr, 1)
             database.close(connection)
             tlConnection.remove()
             throw e
@@ -108,12 +112,20 @@ extends AsyncDatabase {
       case e: TimeoutException => {
         val isCancellable = startCoordinator.compareAndSet(true, false)
         if (isCancellable) {
-          stats.incr("db-async-open-timeout-count", 1)
+          stats.incr("db-async-open-timeout-total", 1)
+          stats.incr("db-async-open-timeout-" + dbStr, 1)
           future.cancel()
           Future.exception(e)
         } else {
           future  // note: this is the original future not bounded by within().
         }
+      }
+
+      // Track stats for max waiters exceeded.
+      case e: RejectedExecutionException => {
+        stats.incr("db-async-max-waiters-exceeded-total", 1)
+        stats.incr("db-async-max-waiters-exceeded-" + dbStr, 1)
+        Future.exception(e)
       }
     }
   }
