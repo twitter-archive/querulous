@@ -3,7 +3,8 @@ package com.twitter.querulous.unit
 import org.specs.Specification
 import java.sql.Connection
 import java.util.concurrent.atomic._
-import com.twitter.util.Future
+import java.util.concurrent.RejectedExecutionException
+import com.twitter.util.{Future, TimeoutException}
 import com.twitter.querulous.database._
 import com.twitter.querulous.query._
 import com.twitter.querulous.async._
@@ -34,8 +35,9 @@ class BlockingDatabaseWrapperSpec extends Specification {
     }
 
     val numThreads = 2
-    val wrapper = new BlockingDatabaseWrapper(numThreads, Int.MaxValue, database)
-    // TODO: Test max waiters.
+    val maxWaiters = 1000
+    val wrapper = new BlockingDatabaseWrapper(numThreads, maxWaiters, database)
+
     doBefore { database.reset() }
 
     "withConnection should follow connection lifecycle" in {
@@ -87,6 +89,32 @@ class BlockingDatabaseWrapperSpec extends Specification {
       println("Cancelled: "+ (100000 - completed.size))
       println("Completed: "+ completed.size)
       println("Cached:    "+ database.openConns.get)
+
+
+      database.totalOpens.get mustEqual numThreads
+      database.openConns.get mustEqual numThreads
+    }
+
+    "withConnection should respect open timeout and max waiters" in {
+      val futures = for (i <- 1 to 10000) yield {
+        wrapper.withConnection { _ =>
+          Thread.sleep(database.openTimeout * 2)
+          "Done"
+        } handle {
+          case e: RejectedExecutionException => "Rejected"
+          case e: TimeoutException           => "Timeout"
+          case _                             => "Failed"
+        }
+      }
+
+      val results = Future.collect(futures).apply()
+      val completed = results partition { _ == "Done" } _1
+      val rejected = results partition { _ == "Rejected" } _1
+      val timedout = results partition { _ == "Timeout" } _1
+
+      completed.size mustEqual numThreads
+      timedout.size mustEqual maxWaiters
+      rejected.size mustEqual (results.size - completed.size - timedout.size)
 
       database.totalOpens.get mustEqual numThreads
       database.openConns.get mustEqual numThreads
