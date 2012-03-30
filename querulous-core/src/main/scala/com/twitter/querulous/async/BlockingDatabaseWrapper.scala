@@ -51,9 +51,13 @@ extends AsyncDatabase {
   // returns an ExecutorService, which unfortunately doesn't give us as much visibility into stats as
   // the ThreadPoolExecutor, so we create one ourselves. We use a LinkedBlockingQueue for memory efficiency
   // since maxWaiters can be very high (configuration default is Int.MaxValue, i.e. unbounded).
-  private val executor = new ThreadPoolExecutor(workPoolSize, workPoolSize, 0L, TimeUnit.MILLISECONDS,
-                                                new LinkedBlockingQueue[Runnable](maxWaiters),
-                                                new DaemonThreadFactory("asyncWorkPool-" + dbStr));
+  private val executor = {
+    val e = new ThreadPoolExecutor(workPoolSize, workPoolSize, 0L, TimeUnit.MILLISECONDS,
+                                   new LinkedBlockingQueue[Runnable](maxWaiters),
+                                   new DaemonThreadFactory("asyncWorkPool-" + dbStr));
+    stats.addGauge("db-async-waiters-" + dbStr)(e.getQueue.size)
+    e
+  }
   private val workPool = FuturePool(executor)
   private val openTimeout = database.openTimeout
 
