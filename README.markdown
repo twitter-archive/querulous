@@ -229,7 +229,7 @@ Add the following dependency and repository stanzas to your project's configurat
     <dependency>
         <groupId>com.twitter</groupId>
         <artifactId>querulous</artifactId>
-        <version>1.1.0</version>
+        <version>2.7.6</version>
     </dependency>
 
     <repository>
@@ -241,7 +241,7 @@ Add the following dependency and repository stanzas to your project's configurat
 
 Add the following dependency to ivy.xml
 
-    <dependency org="com.twitter" name="querulous" rev="1.1.0"/>
+    <dependency org="com.twitter" name="querulous" rev="2.7.6"/>
 
 and the following repository to ivysettings.xml
 
