@@ -11,6 +11,12 @@ class SqlQueryFactory extends QueryFactory {
   }
 }
 
+class ScrollingSqlQueryFactory extends QueryFactory {
+  def apply(connection: Connection, queryClass: QueryClass, query: String, params: Any*) = {
+    new SqlQuery(connection, query, params: _*) with ScrollingResultSetGenerator
+  }
+}
+
 class TooFewQueryParametersException(t: Throwable) extends Exception(t)
 class TooManyQueryParametersException(t: Throwable) extends Exception(t)
 
@@ -170,8 +176,10 @@ class SqlQuery(connection: Connection, val query: String, params: Any*) extends 
     }.mkString
 
   private def buildStatement(connection: Connection, query: String, params: Any*) = {
-    val statement = connection.prepareStatement(expandArrayParams(query + annotationsAsComment, params: _*))
+    // scrolling, concurrency, and direction inherited from ResultSetGenerator
+    val statement = connection.prepareStatement(expandArrayParams(query + annotationsAsComment, params: _*), scrolling, concurrency)
     setBindVariable(statement, 1, params)
+    statement.setFetchDirection(direction)
     statement
   }
 
