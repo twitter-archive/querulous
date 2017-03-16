@@ -1,3 +1,7 @@
+# STATUS
+
+Twitter is no longer maintaining this project or responding to issues or PRs.
+
 # Querulous
 
 An agreeable way to talk to your database.
